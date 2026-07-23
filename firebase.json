@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "target": "jinjinga",
+    "public": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "README.md"]
+  }
+}

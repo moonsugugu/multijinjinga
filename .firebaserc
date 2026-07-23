@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "gen-lang-client-0204797514"
+  },
+  "targets": {
+    "gen-lang-client-0204797514": {
+      "hosting": {
+        "jinjinga": [
+          "jinjinga-class"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

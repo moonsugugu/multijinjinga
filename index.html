@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>멀티진진가 — made by 문수네집</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#1f2937; --sub:#6b7280;
+    --primary:#6d28d9; --primary-d:#5b21b6; --accent:#f59e0b;
+    --good:#10b981; --bad:#ef4444; --line:#e5e7eb; --soft:#f3e8ff;
+    --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; font-family:'Segoe UI','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+    background:linear-gradient(160deg,#f5f3ff 0%,#f4f6fb 40%,#fdf4ff 100%);
+    color:var(--ink); min-height:100vh;
+  }
+  #app{max-width:900px; margin:0 auto; padding:16px;}
+  .screen{display:none;}
+  .screen.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; margin-bottom:16px; box-shadow:0 2px 10px rgba(30,41,99,.06);}
+  h1{font-size:27px; margin:8px 0 4px; text-align:center;}
+  h2{font-size:18px; margin:0 0 12px;}
+  .tagline{text-align:center; color:var(--sub); margin:0 0 20px; font-size:14px;}
+  .btn{
+    display:inline-block; border:none; border-radius:12px; cursor:pointer;
+    font-size:16px; font-weight:700; padding:14px 20px; transition:transform .06s, background .15s;
+    background:var(--primary); color:#fff; width:100%;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn:disabled{background:#c9c3dd; cursor:not-allowed;}
+  .btn.secondary{background:#eef0f7; color:var(--ink);}
+  .btn.warn{background:var(--bad);}
+  .btn.accent{background:var(--accent);}
+  .btn.good{background:var(--good);}
+  .btn.big{font-size:20px; padding:18px;}
+  .row{display:flex; gap:10px; align-items:center;}
+  .row > *{flex:1;}
+  input[type=text], textarea, select{
+    width:100%; font-size:16px; padding:12px 14px; border:1.5px solid var(--line);
+    border-radius:12px; outline:none; background:#fafbff; font-family:inherit;
+  }
+  input[type=text]:focus, textarea:focus, select:focus{border-color:var(--primary);}
+  label.f{display:block; font-size:13px; font-weight:700; color:var(--sub); margin:14px 0 6px;}
+  .code-big{
+    font-size:40px; font-weight:900; letter-spacing:8px; text-align:center;
+    color:var(--primary); margin:6px 0;
+  }
+  .center{text-align:center;}
+  #qrcode{display:flex; justify-content:center; margin:12px 0;}
+  #qrcode img, #qrcode canvas{border:10px solid #fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.12);}
+  .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{
+    background:var(--soft); color:var(--primary-d); font-weight:700; font-size:14px;
+    padding:7px 14px; border-radius:999px; display:inline-flex; align-items:center; gap:6px;
+  }
+  .chip.done{background:#dcfce7; color:#166534;}
+  .chip.writing{background:#fef3c7; color:#92400e;}
+  .muted{color:var(--sub); font-size:13px;}
+  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:14px; gap:8px;}
+  .topbar .pill{background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-weight:700; white-space:nowrap;}
+  .toggle{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .toggle .t{
+    border:2px solid var(--line); border-radius:14px; padding:14px; cursor:pointer;
+    text-align:center; background:#fafbff; transition:all .15s;
+  }
+  .toggle .t .ic{font-size:26px;}
+  .toggle .t .nm{font-weight:800; margin-top:4px;}
+  .toggle .t .ds{font-size:12px; color:var(--sub); margin-top:3px;}
+  .toggle .t.sel{border-color:var(--primary); background:var(--soft); box-shadow:0 0 0 3px rgba(109,40,217,.15);}
+  .hidden{display:none !important;}
+  .writein{margin-bottom:10px;}
+  .writein .n{font-size:12px; font-weight:800; color:var(--primary); margin-bottom:3px;}
+  .picker-row{
+    border:2px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px;
+    background:#fafbff; transition:all .15s; cursor:pointer;
+  }
+  .picker-row.sel{border-color:var(--bad); background:#fef2f2; box-shadow:0 0 0 3px rgba(239,68,68,.12);}
+  .picker-row .real{font-weight:700; display:flex; align-items:flex-start; gap:8px;}
+  .picker-row .real .dot{
+    flex:0 0 20px; width:20px; height:20px; border-radius:50%; border:2px solid #cbd5e1;
+    margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff;
+  }
+  .picker-row.sel .real .dot{border-color:var(--bad); background:var(--bad);}
+  .picker-row .fakebox{margin-top:10px;}
+  .picker-row .fakebox label{font-size:12px; font-weight:800; color:var(--bad);}
+  .badge-fake{background:var(--bad); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px;}
+
+  /* 발표(문제) 화면 */
+  .stage-q{
+    background:linear-gradient(135deg,#6d28d9,#9333ea); color:#fff;
+    border-radius:var(--radius); padding:20px 18px; margin-bottom:16px; text-align:center;
+  }
+  .stage-q .who{font-size:15px; opacity:.9;}
+  .stage-q .topic{font-size:13px; opacity:.75; margin-top:2px;}
+  .stage-q .ask{font-size:22px; font-weight:900; margin-top:8px;}
+  .opts{display:flex; flex-direction:column; gap:12px;}
+  .opt{
+    border:2.5px solid var(--line); border-radius:16px; padding:16px 18px; background:#fff;
+    font-size:19px; font-weight:700; cursor:pointer; transition:all .12s; position:relative;
+    display:flex; align-items:center; gap:14px;
+  }
+  .opt .lab{
+    flex:0 0 34px; width:34px; height:34px; border-radius:50%; background:var(--soft); color:var(--primary-d);
+    display:flex; align-items:center; justify-content:center; font-weight:900; font-size:18px;
+  }
+  .opt .txt{flex:1;}
+  .opt.picked{border-color:var(--primary); background:var(--soft);}
+  .opt.disabled{cursor:default; opacity:.9;}
+  .opt.reveal-fake{border-color:var(--bad); background:#fef2f2;}
+  .opt.reveal-real{border-color:var(--good); background:#f0fdf4;}
+  .opt .tag{
+    position:absolute; right:14px; top:-12px; font-size:12px; font-weight:900; padding:3px 10px; border-radius:999px; color:#fff;
+  }
+  .opt .tag.f{background:var(--bad);} .opt .tag.r{background:var(--good);}
+  .votebar-wrap{margin-top:8px;}
+  .votebar{height:10px; background:#eef0f7; border-radius:999px; overflow:hidden; margin-top:6px;}
+  .votebar > i{display:block; height:100%; background:var(--primary); border-radius:999px; transition:width .3s;}
+  .opt.reveal-fake .votebar > i{background:var(--bad);}
+  .votecount{font-size:12px; color:var(--sub); margin-top:4px;}
+  .reveal-box{
+    background:#f0fdf4; border:1.5px solid #86efac; border-radius:14px; padding:14px; margin-top:14px; font-size:15px; line-height:1.7;
+  }
+  .reveal-box b{color:#166534;}
+  ol.steps{padding-left:20px; line-height:1.9; font-size:14px;}
+  table.ptab{width:100%; border-collapse:collapse; font-size:14px;}
+  table.ptab th{color:var(--sub); font-size:12px; text-align:left; padding:6px 8px; border-bottom:1px solid var(--line);}
+  table.ptab td{padding:8px; border-bottom:1px solid #f1f2f8;}
+  .keyhelp{background:#fff7ed; border:1.5px solid #fdba74; border-radius:12px; padding:12px 14px; font-size:13px; line-height:1.7;}
+  .tipbox{background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:12px; padding:12px 14px; margin:12px 0 14px; font-size:13.5px; line-height:1.6;}
+  .tipbox .tt{font-weight:800; color:#1e40af; margin-bottom:8px; font-size:14px;}
+  .tipbox .ex{background:#fff; border-radius:8px; padding:7px 10px; margin-bottom:6px;}
+  .tipbox .ex s{color:var(--bad); opacity:.8;}
+  .tipbox .ex b{color:#1d4ed8;}
+  .tipbox .tn{color:var(--bad); font-weight:700; margin-top:4px;}
+  .keyhelp a{color:var(--primary-d); font-weight:700;}
+  .flash{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#1f2937; color:#fff;
+    padding:10px 20px; border-radius:999px; font-size:14px; font-weight:700; z-index:60; opacity:0; transition:opacity .2s; pointer-events:none;}
+  .flash.show{opacity:1;}
+  .credit{margin:26px 0 10px; text-align:center;}
+  .credit .madeby{font-size:14px; color:var(--sub); margin-bottom:10px;}
+  .credit .madeby b{color:var(--primary-d);}
+  .clinks{display:flex; flex-wrap:wrap; gap:8px; justify-content:center;}
+  .lbtn{
+    display:inline-flex; align-items:center; gap:6px; text-decoration:none;
+    border:1.8px solid var(--primary); color:var(--primary-d); background:#fff;
+    font-size:13.5px; font-weight:700; padding:8px 14px; border-radius:999px;
+    transition:all .15s;
+  }
+  .lbtn:hover{background:var(--soft); transform:translateY(-1px);}
+  .lbtn:active{transform:scale(.97);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════ 홈 ══════════ -->
+  <section id="scr-home" class="screen">
+    <h1>🎭 멀티진진가</h1>
+    <p class="tagline">진짜 진짜 <b>가짜</b>! 5개 중 딱 하나뿐인 가짜를 찾아라</p>
+    <div class="card">
+      <h2>👩‍🏫 선생님</h2>
+      <button class="btn big" id="btn-create">문제 방 만들기</button>
+    </div>
+    <div class="card">
+      <h2>🙋 학생</h2>
+      <p class="muted" style="margin-top:0">QR코드를 찍으면 자동 입장돼요. 코드로 직접 들어올 수도 있어요.</p>
+      <div class="row">
+        <input type="text" id="in-code" placeholder="방 코드 (예: AB3CD)" maxlength="5" style="text-transform:uppercase">
+        <button class="btn secondary" id="btn-code-join" style="flex:0 0 90px">입장</button>
+      </div>
+    </div>
+    <footer class="credit">
+      <div class="madeby">made by <b>문수네집</b></div>
+      <div class="clinks">
+        <a class="lbtn" href="https://moonsunezipbrand.vercel.app" target="_blank" rel="noopener">🏠 문수네집</a>
+        <a class="lbtn" href="https://www.instagram.com/moonsune.zip/" target="_blank" rel="noopener">📷 인스타그램</a>
+        <a class="lbtn" href="https://moonsune-zip.vercel.app/" target="_blank" rel="noopener">✨ moonsune.zip</a>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ══════════ 선생님: 방 만들기 설정 ══════════ -->
+  <section id="scr-create" class="screen">
+    <div class="topbar"><span class="pill">👩‍🏫 방 만들기</span>
+      <button class="btn secondary" style="width:auto; padding:8px 14px; font-size:13px" id="btn-create-back">← 뒤로</button></div>
+    <div class="card">
+      <h2>📝 주제 정하기</h2>
+      <label class="f">이번 게임의 주제 / 제목</label>
+      <input type="text" id="in-topic" placeholder="예) 나를 소개합니다 / 조선시대 인물 / 우리 반 상식" maxlength="40">
+      <div class="muted" style="margin-top:6px">학생들은 이 주제에 맞는 <b>진짜 사실 5개</b>를 적게 돼요.</div>
+    </div>
+    <div class="card">
+      <h2>🎮 이렇게 진행돼요</h2>
+      <ol class="steps">
+        <li>학생들이 주제에 맞는 <b>진짜 사실 5개</b>를 적어요</li>
+        <li>그중 <b>1개</b>를 골라 <b>비슷한 가짜</b>로 직접 바꿔요 <span class="muted">(예시·팁 자동 안내)</span></li>
+        <li>다 모이면 <b>한 명씩</b> 문제를 띄우고, 반 전체가 폰으로 가짜를 맞혀요</li>
+      </ol>
+      <button class="btn big accent" id="btn-do-create" style="margin-top:8px">🚀 방 만들기</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 선생님: 대기실(작성 현황) ══════════ -->
+  <section id="scr-lobby" class="screen">
+    <div class="topbar">
+      <span class="pill">👩‍🏫 <span id="lobby-topic"></span></span>
+      <button class="btn warn" style="width:auto; padding:8px 14px; font-size:13px" id="btn-close-room">방 닫기</button>
+    </div>
+    <div class="card center">
+      <h2>📱 학생들은 QR을 찍어 주세요</h2>
+      <div id="qrcode"></div>
+      <div class="muted">또는 코드 입력</div>
+      <div class="code-big" id="lobby-code"></div>
+      <div class="muted" id="lobby-url" style="word-break:break-all"></div>
+    </div>
+    <div class="card">
+      <h2>✍️ 작성 현황 — <span id="lobby-progress" style="color:var(--primary)">0 / 0</span> 완료</h2>
+      <div class="chips" id="lobby-players"><span class="muted">아직 입장한 학생이 없어요...</span></div>
+    </div>
+    <button class="btn big good" id="btn-start-present">🎬 발표 시작하기</button>
+    <div class="muted center" style="margin-top:8px">제출을 마친 학생들의 문제부터 순서대로 보여줘요.</div>
+  </section>
+
+  <!-- ══════════ 학생: 입장 ══════════ -->
+  <section id="scr-join" class="screen">
+    <h1>🎭 멀티진진가</h1>
+    <p class="tagline">방 코드: <b id="join-code-label"></b></p>
+    <div class="card">
+      <h2>🙋 이름을 알려 주세요</h2>
+      <input type="text" id="in-name" placeholder="이름 입력 (예: 김하늘)" maxlength="12">
+      <button class="btn big" id="btn-join" style="margin-top:12px">입장하기</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 학생: 문제 작성 ══════════ -->
+  <section id="scr-write" class="screen">
+    <div class="topbar"><span class="pill">🙋 <span id="write-name"></span></span>
+      <span class="pill">주제: <b id="write-topic"></b></span></div>
+    <div class="card">
+      <h2>1️⃣ 진짜 사실 5가지를 적어요</h2>
+      <p class="muted" style="margin-top:0">모두 <b>진짜</b>로 적으세요. 이 중 하나만 나중에 가짜로 바꿀 거예요.</p>
+      <div id="write-inputs"></div>
+    </div>
+    <div class="card" id="write-step2hint">
+      <button class="btn big" id="btn-to-fake">2️⃣ 다음: 가짜로 만들 항목 고르기</button>
+    </div>
+    <div class="card hidden" id="write-fakecard">
+      <h2>2️⃣ 가짜로 만들 항목 <b>1개</b>를 골라요</h2>
+      <p class="muted" style="margin-top:0">항목을 하나 고르고, 진짜와 <b>아주 비슷하지만 사실이 아닌</b> 가짜 문구로 바꿔요.</p>
+      <div class="tipbox">
+        <div class="tt">💡 가짜 잘 만드는 법 — <b>티 안 나게 살짝만</b> 바꾸기!</div>
+        <div class="ex">🔢 숫자·개수 &nbsp;·&nbsp; 강아지를 <s>3마리</s> 키운다 → 강아지를 <b>2마리</b> 키운다</div>
+        <div class="ex">📍 장소 &nbsp;·&nbsp; <s>제주도</s>에서 태어났다 → <b>부산</b>에서 태어났다</div>
+        <div class="ex">📅 연도·이름 &nbsp;·&nbsp; <s>2015년</s>에 이사했다 → <b>2016년</b>에 이사했다</div>
+        <div class="tn">❌ 너무 뻔하거나 불가능한 건 금지! (예: "하늘을 난다")</div>
+      </div>
+      <div id="fake-picker"></div>
+      <button class="btn big good" id="btn-submit-problem" style="margin-top:6px">✅ 제출하기</button>
+      <button class="btn secondary" id="btn-back-write" style="margin-top:8px">← 사실 다시 고치기</button>
+    </div>
+  </section>
+
+  <!-- ══════════ 학생: 제출 완료 대기 ══════════ -->
+  <section id="scr-wait" class="screen">
+    <h1>✅ 제출 완료!</h1>
+    <p class="tagline">선생님이 발표를 시작하면 문제가 나타나요.</p>
+    <div class="card">
+      <h2>👥 함께 기다리는 친구들 <span class="muted" id="wait-progress"></span></h2>
+      <div class="chips" id="wait-players"></div>
+    </div>
+    <button class="btn secondary" id="btn-edit-problem">✏️ 내 문제 다시 만들기</button>
+  </section>
+
+  <!-- ══════════ 선생님: 발표/투표 진행 ══════════ -->
+  <section id="scr-tpresent" class="screen">
+    <div class="topbar">
+      <span class="pill">👩‍🏫 진행 <b id="tp-progress"></b></span>
+      <span class="pill">방 코드: <b id="tp-code"></b></span>
+    </div>
+    <div class="stage-q">
+      <div class="who" id="tp-who"></div>
+      <div class="topic" id="tp-topic"></div>
+      <div class="ask">🤔 이 중에서 <b>가짜</b>는 무엇일까요?</div>
+    </div>
+    <div class="opts" id="tp-opts"></div>
+    <div class="card" style="margin-top:14px; padding:14px 16px">
+      <div id="tp-votestatus" class="center" style="font-weight:800"></div>
+    </div>
+    <div class="row">
+      <button class="btn secondary" id="btn-prev-q" style="flex:0 0 90px">← 이전</button>
+      <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
+      <button class="btn good" id="btn-next-q">다음 →</button>
+    </div>
+    <button class="btn warn" id="btn-end-present" style="margin-top:12px">🏁 게임 종료</button>
+  </section>
+
+  <!-- ══════════ 학생: 발표/투표 ══════════ -->
+  <section id="scr-spresent" class="screen">
+    <div class="topbar"><span class="pill">🙋 <span id="sp-name"></span></span>
+      <span class="pill" id="sp-progress"></span></div>
+    <div class="stage-q">
+      <div class="who" id="sp-who"></div>
+      <div class="ask" id="sp-ask">🤔 가짜를 골라 보세요!</div>
+    </div>
+    <div class="opts" id="sp-opts"></div>
+    <div class="center muted" id="sp-hint" style="margin-top:14px"></div>
+    <div class="reveal-box hidden" id="sp-reveal"></div>
+  </section>
+
+  <!-- ══════════ 결과 ══════════ -->
+  <section id="scr-done" class="screen">
+    <h1>🏆 게임 끝!</h1>
+    <p class="tagline">모두 수고했어요!</p>
+    <div class="card" id="done-teacher">
+      <h2>📊 문제별 결과</h2>
+      <table class="ptab">
+        <thead><tr><th>문제</th><th>정답(가짜)</th><th>맞힌 비율</th></tr></thead>
+        <tbody id="done-rows"></tbody>
+      </table>
+    </div>
+    <div id="done-teacher-btns" style="display:none">
+      <button class="btn accent big" id="btn-again">🔄 새 문제로 한 판 더</button>
+      <button class="btn secondary" id="btn-home2" style="margin-top:10px">처음으로</button>
+    </div>
+    <div id="done-student-msg" class="center muted" style="display:none">선생님이 새 게임을 시작하면 자동으로 이동해요 😊</div>
+  </section>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════
+   Firebase 설정 (qr-bingo와 동일 프로젝트의 Realtime Database 재사용)
+   진진가 데이터는 rooms/JJG_<코드> 경로에만 저장됩니다.
+   ════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDFxuYegSpV-ua15jNGgHosq8gRlYY-HFY",
+  authDomain: "gen-lang-client-0204797514.firebaseapp.com",
+  databaseURL: "https://gen-lang-client-0204797514-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "gen-lang-client-0204797514",
+  storageBucket: "gen-lang-client-0204797514.firebasestorage.app",
+  messagingSenderId: "856332907776",
+  appId: "1:856332907776:web:70c5a1ca16421ebb84efe5"
+};
+
+const $ = id => document.getElementById(id);
+const NLET = ["A","B","C","D","E"];
+
+let db = null;
+const S = {
+  role:null, code:null, pid:null, name:null,
+  room:null, screen:null, qrDone:false,
+  pendingCode:null,
+  writeReals:[], writeFakeIdx:null,
+  votedFor:null,
+};
+
+/* ─────────── 유틸 ─────────── */
+function randInt(lo,hi){ return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function genCode(){ const c="ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let s=""; for(let i=0;i<5;i++) s+=c[randInt(0,c.length-1)]; return s; }
+function esc(s){ return String(s??"").replace(/[<>&"]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])); }
+function showScreen(id){
+  if(S.screen===id) { return; }
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active"); S.screen=id; window.scrollTo(0,0);
+}
+function flash(msg){ const f=$("flash"); f.textContent=msg; f.classList.add("show"); clearTimeout(f._t); f._t=setTimeout(()=>f.classList.remove("show"),1800); }
+function roomRef(){ return db.ref("rooms/JJG_"+S.code); }
+function refFor(code){ return db.ref("rooms/JJG_"+code); }
+function saveSession(){ sessionStorage.setItem("jjg-session", JSON.stringify({role:S.role, code:S.code, pid:S.pid, name:S.name})); }
+function clearSession(){ sessionStorage.removeItem("jjg-session"); }
+
+/* ─────────── 방 만들기 / 입장 ─────────── */
+async function doCreateRoom(){
+  const topic = $("in-topic").value.trim();
+  if(!topic){ flash("주제를 입력해 주세요!"); $("in-topic").focus(); return; }
+  S.role="teacher"; S.code=genCode(); S.qrDone=false;
+  await roomRef().set({
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    state:"writing", topic,
+  });
+  saveSession(); attachRoom();
+}
+
+async function joinRoom(code, name){
+  const snap = await refFor(code).get();
+  if(!snap.exists()){ flash("방을 찾을 수 없어요. 코드를 확인해 주세요!"); return false; }
+  S.role="student"; S.code=code; S.name=name;
+  const pref = roomRef().child("players").push();
+  S.pid = pref.key;
+  await pref.set({ name, joinedAt: firebase.database.ServerValue.TIMESTAMP, submitted:false });
+  saveSession(); attachRoom();
+  return true;
+}
+
+/* ─────────── 실시간 동기화 ─────────── */
+function attachRoom(){
+  roomRef().on("value", snap=>{
+    const room = snap.val();
+    if(!room){ if(S.role==="student") flash("선생님이 방을 닫았어요."); goHome(); return; }
+    S.room = room; render();
+  });
+}
+function detachRoom(){ if(S.code && db) refFor(S.code).off(); }
+function goHome(){
+  detachRoom(); clearSession();
+  Object.assign(S, {role:null, code:null, pid:null, name:null, room:null, qrDone:false, votedFor:null,
+    writeReals:[], writeFakeIdx:null});
+  showScreen("scr-home");
+}
+
+/* ─────────── 상태 기반 라우팅 ─────────── */
+function render(){
+  const room = S.room; if(!room) return;
+  const state = room.state || "writing";
+  const prev = S.prevState; S.prevState = state;
+  if(S.role==="teacher"){
+    if(state==="writing")         { showScreen("scr-lobby");     renderLobby(); }
+    else if(state==="presenting") { showScreen("scr-tpresent");  renderTPresent(); }
+    else                          { showScreen("scr-done");      renderDone(); }
+  } else {
+    const me = (room.players||{})[S.pid] || {};
+    if(state==="writing"){
+      if(me.submitted){ showScreen("scr-wait"); renderWait(); }
+      else            { if(prev && prev!=="writing") resetWriteDOM(); ensureWriteScreen(); renderWriteHeader(); }
+    }
+    else if(state==="presenting"){ showScreen("scr-spresent"); renderSPresent(); }
+    else                         { showScreen("scr-done");    renderDone(); }
+  }
+}
+
+/* ─────────── 선생님: 대기실 ─────────── */
+function renderLobby(){
+  $("lobby-topic").textContent = S.room.topic || "진진가";
+  if(!S.qrDone){
+    S.qrDone = true;
+    const url = location.origin + location.pathname + "?room=" + S.code;
+    $("qrcode").innerHTML = "";
+    new QRCode($("qrcode"), { text:url, width:220, height:220, correctLevel:QRCode.CorrectLevel.M });
+    $("lobby-code").textContent = S.code;
+    $("lobby-url").textContent = url;
+  }
+  const players = S.room.players || {};
+  const list = Object.entries(players);
+  const done = list.filter(([,p])=>p.submitted).length;
+  $("lobby-progress").textContent = done + " / " + list.length;
+  $("lobby-players").innerHTML = list.length
+    ? list.map(([,p])=>`<span class="chip ${p.submitted?"done":"writing"}">${esc(p.name)} ${p.submitted?"✅":"✍️"}</span>`).join("")
+    : '<span class="muted">아직 입장한 학생이 없어요...</span>';
+  $("btn-start-present").disabled = done===0;
+  $("btn-start-present").textContent = done===0 ? "제출한 학생을 기다려요..."
+    : (done<list.length ? `🎬 발표 시작 (${done}명 제출됨, ${list.length-done}명 아직)` : "🎬 발표 시작하기 (전원 완료!)");
+}
+
+async function startPresenting(){
+  const probs = S.room.problems || {};
+  const order = Object.keys(probs).sort((a,b)=>(probs[a].submittedAt||0)-(probs[b].submittedAt||0));
+  if(!order.length){ flash("아직 제출한 학생이 없어요!"); return; }
+  const players = S.room.players || {};
+  const notDone = Object.values(players).filter(p=>!p.submitted).length;
+  if(notDone>0 && !confirm(`아직 ${notDone}명이 작성 중이에요. 지금 발표를 시작할까요?\n(제출한 ${order.length}명의 문제로 진행돼요)`)) return;
+  await roomRef().update({ state:"presenting", present:{ order, idx:0, revealed:false }, votes:null });
+}
+
+/* ─────────── 선생님: 발표/투표 ─────────── */
+function currentOwner(){ const p=S.room.present; return p && p.order ? p.order[p.idx] : null; }
+function ownerProblem(owner){ return (S.room.problems||{})[owner]; }
+function votesFor(owner){ return (S.room.votes||{})[owner] || {}; }
+
+function renderTPresent(){
+  const room = S.room, pres = room.present || {order:[],idx:0};
+  const owner = currentOwner(), prob = ownerProblem(owner), players = room.players||{};
+  $("tp-code").textContent = S.code;
+  $("tp-progress").textContent = (pres.idx+1) + " / " + pres.order.length;
+  $("tp-who").textContent = "🙋 " + (players[owner]? players[owner].name : "?") + " 님의 문제";
+  $("tp-topic").textContent = room.topic ? "주제: "+room.topic : "";
+  if(!prob){ $("tp-opts").innerHTML = '<div class="muted center">문제를 불러올 수 없어요</div>'; return; }
+
+  const votes = votesFor(owner);
+  const counts = [0,0,0,0,0];
+  Object.values(votes).forEach(c=>{ if(c>=0&&c<5) counts[c]++; });
+  const total = Object.keys(votes).length;
+  const revealed = !!pres.revealed;
+
+  $("tp-opts").innerHTML = prob.items.map((t,i)=>{
+    const cls = revealed ? (i===prob.fakeIndex?"reveal-fake":"reveal-real") : "";
+    const pct = total? Math.round(counts[i]/total*100):0;
+    const tag = revealed ? (i===prob.fakeIndex?'<span class="tag f">가짜!</span>':'<span class="tag r">진짜</span>') : "";
+    return `<div class="opt disabled ${cls}">${tag}
+      <div class="lab">${NLET[i]}</div>
+      <div class="txt">${esc(t)}
+        <div class="votebar-wrap"><div class="votebar"><i style="width:${pct}%"></i></div>
+        <div class="votecount">${counts[i]}표 · ${pct}%</div></div>
+      </div></div>`;
+  }).join("");
+
+  const voters = countVoters(owner);
+  if(revealed){
+    const correct = counts[prob.fakeIndex];
+    $("tp-votestatus").innerHTML = `정답은 <b style="color:var(--bad)">${NLET[prob.fakeIndex]}</b> (가짜)! `+
+      `진짜는 <b>"${esc(prob.realValue||"")}"</b> · ${voters}명 중 <b>${correct}명</b> 정답`;
+  } else {
+    $("tp-votestatus").textContent = `투표 현황: ${total}명 참여 (학생들이 각자 폰에서 고르는 중)`;
+  }
+  $("btn-reveal").style.display = revealed ? "none" : "block";
+  $("btn-next-q").textContent = (pres.idx+1>=pres.order.length) ? "🏁 결과 보기" : "다음 →";
+  $("btn-prev-q").disabled = pres.idx===0;
+}
+function countVoters(owner){
+  // 문제 주인을 제외한 참여 학생 수는 알 수 없으니 실제 투표수 기준
+  return Object.keys(votesFor(owner)).length;
+}
+async function revealAnswer(){ await roomRef().child("present/revealed").set(true); }
+async function nextProblem(){
+  const p=S.room.present, ni=p.idx+1;
+  if(ni>=p.order.length){ await roomRef().update({ state:"done" }); }
+  else await roomRef().update({ "present/idx":ni, "present/revealed":false });
+}
+async function prevProblem(){
+  const p=S.room.present; if(p.idx<=0) return;
+  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false });
+}
+async function endPresent(){ if(confirm("게임을 종료하고 결과를 볼까요?")) await roomRef().update({ state:"done" }); }
+
+/* ─────────── 학생: 발표/투표 ─────────── */
+function renderSPresent(){
+  const room=S.room, pres=room.present||{order:[],idx:0};
+  const owner=currentOwner(), prob=ownerProblem(owner), players=room.players||{};
+  $("sp-name").textContent = S.name;
+  $("sp-progress").textContent = (pres.idx+1)+" / "+pres.order.length;
+  $("sp-who").textContent = "🙋 "+(players[owner]?players[owner].name:"?")+" 님의 문제";
+  if(!prob){ $("sp-opts").innerHTML=""; return; }
+  const revealed = !!pres.revealed;
+  const isOwner = owner===S.pid;
+  const myVote = ((room.votes||{})[owner]||{})[S.pid];
+  const votes = votesFor(owner), counts=[0,0,0,0,0], total=Object.keys(votes).length;
+  Object.values(votes).forEach(c=>{ if(c>=0&&c<5) counts[c]++; });
+
+  $("sp-ask").textContent = isOwner ? "🌟 내가 낸 문제예요! 친구들이 맞히는 중" : (revealed? "결과 공개!" : "🤔 가짜를 골라 보세요!");
+
+  $("sp-opts").innerHTML = prob.items.map((t,i)=>{
+    let cls="";
+    if(revealed) cls = i===prob.fakeIndex?"reveal-fake":"reveal-real";
+    else if(myVote===i) cls="picked";
+    const dis = (revealed||isOwner) ? "disabled":"";
+    const tag = revealed ? (i===prob.fakeIndex?'<span class="tag f">가짜!</span>':'<span class="tag r">진짜</span>') : "";
+    let extra="";
+    if(revealed){ const pct=total?Math.round(counts[i]/total*100):0;
+      extra=`<div class="votebar-wrap"><div class="votebar"><i style="width:${pct}%"></i></div><div class="votecount">${counts[i]}표</div></div>`; }
+    return `<div class="opt ${cls} ${dis}" data-i="${i}"><div class="lab">${NLET[i]}</div><div class="txt">${esc(t)}${extra}</div>${tag}</div>`;
+  }).join("");
+
+  if(!revealed && !isOwner){
+    $("sp-opts").querySelectorAll(".opt").forEach(el=>{
+      el.addEventListener("click", ()=>castVote(Number(el.dataset.i)));
+    });
+  }
+  $("sp-hint").textContent = isOwner ? "내 문제라 투표는 못 해요 🙂"
+    : (revealed? "" : (myVote!=null? "제출됨! 바꾸려면 다시 눌러요. 선생님이 공개하면 정답이 나와요." : "가짜라고 생각하는 항목을 눌러요."));
+
+  const rb=$("sp-reveal");
+  if(revealed){
+    const correct = counts[prob.fakeIndex];
+    const mine = (myVote===prob.fakeIndex);
+    rb.classList.remove("hidden");
+    let head = "";
+    if(isOwner) head = "";
+    else if(myVote==null) head = "";
+    else head = mine ? "🎉 <b>정답!</b> " : "❌ 아쉬워요. ";
+    rb.innerHTML = `${head}가짜는 <b>${NLET[prob.fakeIndex]}</b> 였어요.<br>`+
+      `진짜 사실: <b>"${esc(prob.realValue||"")}"</b><br><span class="muted">${total}명 중 ${correct}명이 맞혔어요.</span>`;
+  } else rb.classList.add("hidden");
+}
+async function castVote(i){
+  const owner=currentOwner(); if(!owner||owner===S.pid) return;
+  if(S.room.present.revealed) return;
+  await roomRef().child("votes/"+owner+"/"+S.pid).set(i);
+  flash("선택: "+NLET[i]);
+}
+
+/* ─────────── 학생: 대기 ─────────── */
+function renderWait(){
+  const players=S.room.players||{}, list=Object.values(players);
+  const done=list.filter(p=>p.submitted).length;
+  $("wait-progress").textContent = `(${done}/${list.length} 완료)`;
+  $("wait-players").innerHTML = list.map(p=>
+    `<span class="chip ${p.submitted?"done":"writing"}">${esc(p.name)}${p.name===S.name?" (나)":""} ${p.submitted?"✅":"✍️"}</span>`).join("");
+}
+
+/* ─────────── 학생: 문제 작성 ─────────── */
+function resetWriteDOM(){
+  $("write-inputs").innerHTML=""; $("write-fakecard").classList.add("hidden");
+  S.writeFakeIdx=null; S.writeReals=[];
+}
+function ensureWriteScreen(){
+  showScreen("scr-write");
+  if($("write-inputs").children.length) return;
+  let html="";
+  for(let i=0;i<5;i++) html+=`<div class="writein"><div class="n">진짜 ${i+1}</div>`+
+    `<input type="text" class="wr-in" data-i="${i}" placeholder="진짜 사실을 적어요" maxlength="80"></div>`;
+  $("write-inputs").innerHTML = html;
+}
+function renderWriteHeader(){
+  $("write-name").textContent = S.name;
+  $("write-topic").textContent = S.room.topic || "";
+}
+function readReals(){
+  return Array.from(document.querySelectorAll(".wr-in")).map(el=>el.value.trim());
+}
+function toFakeStep(){
+  const reals = readReals();
+  if(reals.some(r=>!r)){ flash("진짜 사실 5개를 모두 적어 주세요!"); return; }
+  if(new Set(reals).size<5){ flash("서로 다른 5가지를 적어 주세요!"); return; }
+  S.writeReals = reals;
+  buildFakePicker();
+  $("write-fakecard").classList.remove("hidden");
+  $("write-fakecard").scrollIntoView({behavior:"smooth"});
+}
+function buildFakePicker(){
+  const reals=S.writeReals;
+  $("fake-picker").innerHTML = reals.map((r,i)=>{
+    return `<div class="picker-row" data-i="${i}">
+      <div class="real"><span class="dot">✓</span><span>${esc(r)}</span></div>
+      <div class="fakebox hidden">
+        <label>👉 이 항목을 대신할 <b>가짜 문구</b></label>
+        <input type="text" class="fk-in" data-i="${i}" placeholder="진짜와 비슷하지만 사실이 아닌 문구" maxlength="80">
+      </div></div>`;
+  }).join("");
+  $("fake-picker").querySelectorAll(".picker-row").forEach(row=>{
+    row.addEventListener("click", e=>{
+      if(e.target.classList.contains("fk-in")) return;
+      selectFake(Number(row.dataset.i));
+    });
+  });
+  S.writeFakeIdx=null;
+}
+function selectFake(i){
+  S.writeFakeIdx=i;
+  $("fake-picker").querySelectorAll(".picker-row").forEach(row=>{
+    const on = Number(row.dataset.i)===i;
+    row.classList.toggle("sel", on);
+    row.querySelector(".fakebox").classList.toggle("hidden", !on);
+    if(on){ const inp=row.querySelector(".fk-in"); setTimeout(()=>inp.focus(),50); }
+  });
+}
+async function submitProblem(){
+  const i = S.writeFakeIdx;
+  if(i==null){ flash("가짜로 만들 항목을 골라 주세요!"); return; }
+  const fkInput = document.querySelector(`.fk-in[data-i="${i}"]`);
+  const fake = (fkInput?fkInput.value.trim():"");
+  if(!fake){ flash("가짜 문구를 적어 주세요!"); return; }
+  if(fake===S.writeReals[i]){ flash("가짜가 진짜와 똑같아요! 살짝 바꿔 주세요."); return; }
+  const items = S.writeReals.slice();
+  const realValue = items[i];
+  items[i] = fake;
+  $("btn-submit-problem").disabled=true;
+  await roomRef().child("problems/"+S.pid).set({ items, fakeIndex:i, realValue, submittedAt: firebase.database.ServerValue.TIMESTAMP });
+  await roomRef().child("players/"+S.pid).update({ submitted:true });
+  $("btn-submit-problem").disabled=false;
+  flash("제출 완료! 🎉");
+}
+async function editProblem(){
+  await roomRef().child("players/"+S.pid).update({ submitted:false });
+  await roomRef().child("problems/"+S.pid).remove();
+  $("write-inputs").innerHTML=""; $("write-fakecard").classList.add("hidden");
+}
+
+/* ─────────── 결과 ─────────── */
+function renderDone(){
+  const room=S.room, pres=room.present||{order:[]}, players=room.players||{}, probs=room.problems||{};
+  $("done-teacher").style.display = "block";
+  const rows = (pres.order||[]).map(owner=>{
+    const prob=probs[owner]; if(!prob) return "";
+    const v=(room.votes||{})[owner]||{}, total=Object.keys(v).length;
+    const correct=Object.values(v).filter(c=>c===prob.fakeIndex).length;
+    const pct = total?Math.round(correct/total*100):0;
+    return `<tr><td><b>${esc(players[owner]?players[owner].name:"?")}</b></td>
+      <td><span class="badge-fake">${NLET[prob.fakeIndex]}</span> ${esc(prob.realValue||"")}</td>
+      <td>${total?`${correct}/${total} (${pct}%)`:"-"}</td></tr>`;
+  }).join("");
+  $("done-rows").innerHTML = rows || `<tr><td colspan="3" class="muted">문제가 없어요</td></tr>`;
+  $("done-teacher-btns").style.display = S.role==="teacher"?"block":"none";
+  $("done-student-msg").style.display  = S.role==="student"?"block":"none";
+}
+async function playAgain(){
+  const players=S.room.players||{};
+  const updates={ state:"writing", present:null, votes:null, problems:null };
+  Object.keys(players).forEach(pid=>{ updates[`players/${pid}/submitted`]=false; });
+  S.qrDone=false;
+  await roomRef().update(updates);
+}
+async function closeRoom(){
+  if(!confirm("방을 닫을까요? 학생들도 모두 나가게 돼요.")) return;
+  await roomRef().remove(); goHome();
+}
+
+/* ─────────── 이벤트 연결 ─────────── */
+function wire(){
+  $("btn-create").onclick = ()=>showScreen("scr-create");
+  $("btn-create-back").onclick = ()=>showScreen("scr-home");
+  $("btn-do-create").onclick = doCreateRoom;
+  $("in-topic").addEventListener("keydown",e=>{ if(e.key==="Enter") doCreateRoom(); });
+
+  $("btn-code-join").onclick = ()=>{
+    const code=$("in-code").value.trim().toUpperCase();
+    if(code.length<4){ flash("방 코드를 입력해 주세요!"); return; }
+    S.pendingCode=code; $("join-code-label").textContent=code; showScreen("scr-join");
+  };
+  $("in-code").addEventListener("keydown",e=>{ if(e.key==="Enter") $("btn-code-join").click(); });
+  $("btn-join").onclick = async ()=>{
+    const name=$("in-name").value.trim();
+    if(!name){ flash("이름을 입력해 주세요!"); return; }
+    $("btn-join").disabled=true;
+    const ok=await joinRoom(S.pendingCode,name);
+    $("btn-join").disabled=false;
+    if(!ok) showScreen("scr-home");
+  };
+  $("in-name").addEventListener("keydown",e=>{ if(e.key==="Enter") $("btn-join").click(); });
+
+  $("btn-to-fake").onclick = toFakeStep;
+  $("btn-back-write").onclick = ()=>{ $("write-fakecard").classList.add("hidden"); window.scrollTo(0,0); };
+  $("btn-submit-problem").onclick = submitProblem;
+  $("btn-edit-problem").onclick = editProblem;
+
+  $("btn-start-present").onclick = startPresenting;
+  $("btn-close-room").onclick = closeRoom;
+  $("btn-reveal").onclick = revealAnswer;
+  $("btn-next-q").onclick = nextProblem;
+  $("btn-prev-q").onclick = prevProblem;
+  $("btn-end-present").onclick = endPresent;
+  $("btn-again").onclick = playAgain;
+  $("btn-home2").onclick = goHome;
+}
+
+/* ─────────── 시작 ─────────── */
+function boot(){
+  wire();
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+  const params=new URLSearchParams(location.search);
+  const qrRoom=(params.get("room")||"").toUpperCase();
+  const saved=JSON.parse(sessionStorage.getItem("jjg-session")||"null");
+  if(saved && saved.code){
+    Object.assign(S, saved);
+    refFor(S.code).get().then(snap=>{
+      if(snap.exists()){ if(S.role==="teacher") S.qrDone=false; attachRoom(); }
+      else { clearSession(); routeFresh(qrRoom); }
+    });
+  } else routeFresh(qrRoom);
+}
+function routeFresh(qrRoom){
+  if(qrRoom){ S.pendingCode=qrRoom; $("join-code-label").textContent=qrRoom; showScreen("scr-join"); }
+  else showScreen("scr-home");
+}
+boot();
+</script>
+</body>
+</html>
