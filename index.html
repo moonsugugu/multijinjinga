@@ -51,8 +51,8 @@
     color:var(--primary); margin:6px 0;
   }
   .center{text-align:center;}
-  #qrcode{display:flex; justify-content:center; margin:12px 0;}
-  #qrcode img, #qrcode canvas{border:10px solid #fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.12);}
+  #qrcode, #tp-qr{display:flex; justify-content:center; margin:12px 0;}
+  #qrcode img, #qrcode canvas, #tp-qr img, #tp-qr canvas{border:10px solid #fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.12);}
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
   .chip{
     background:var(--soft); color:var(--primary-d); font-weight:700; font-size:14px;
@@ -95,9 +95,10 @@
     background:linear-gradient(135deg,#6d28d9,#9333ea); color:#fff;
     border-radius:var(--radius); padding:20px 18px; margin-bottom:16px; text-align:center;
   }
-  .stage-q .who{font-size:15px; opacity:.9;}
-  .stage-q .topic{font-size:13px; opacity:.75; margin-top:2px;}
-  .stage-q .ask{font-size:22px; font-weight:900; margin-top:8px;}
+  .stage-q .who{font-size:clamp(26px,6.4vw,40px); font-weight:900; opacity:1; line-height:1.2; text-shadow:0 2px 8px rgba(0,0,0,.18);}
+  .stage-q .topic{font-size:clamp(17px,3.6vw,24px); font-weight:800; opacity:.95; margin-top:6px;
+    display:inline-block; background:rgba(255,255,255,.18); padding:5px 16px; border-radius:999px;}
+  .stage-q .ask{font-size:22px; font-weight:900; margin-top:12px;}
   .opts{display:flex; flex-direction:column; gap:12px;}
   .opt{
     border:2.5px solid var(--line); border-radius:16px; padding:16px 18px; background:#fff;
@@ -153,6 +154,87 @@
   }
   .lbtn:hover{background:var(--soft); transform:translateY(-1px);}
   .lbtn:active{transform:scale(.97);}
+
+  /* ── 카운트다운 오버레이 ── */
+  #countdown{
+    position:fixed; inset:0; z-index:80; display:none;
+    align-items:center; justify-content:center; background:rgba(24,10,60,.72); backdrop-filter:blur(3px);
+  }
+  #countdown.on{display:flex;}
+  #countdown .num{
+    font-size:clamp(120px,40vw,260px); font-weight:900; color:#fff; line-height:1;
+    text-shadow:0 8px 40px rgba(245,158,11,.8);
+    animation:cdpop .8s ease-out;
+  }
+  @keyframes cdpop{
+    0%{transform:scale(.3); opacity:0;}
+    25%{transform:scale(1.15); opacity:1;}
+    60%{transform:scale(1);}
+    100%{transform:scale(.9); opacity:.75;}
+  }
+
+  /* ── 정답 팝업 ── */
+  #ansmodal{
+    position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center;
+    background:rgba(17,10,40,.6); padding:16px;
+  }
+  #ansmodal.on{display:flex; animation:fade .2s ease;}
+  #ansmodal .box{
+    background:#fff; border-radius:24px; width:100%; max-width:560px; max-height:90vh; overflow:auto;
+    box-shadow:0 24px 70px rgba(0,0,0,.35); animation:modalpop .45s cubic-bezier(.2,1.4,.4,1);
+    text-align:center; padding:26px 22px 22px;
+  }
+  @keyframes modalpop{from{transform:scale(.6) translateY(30px); opacity:0;} to{transform:none; opacity:1;}}
+  #ansmodal .head{font-size:26px; font-weight:900; color:var(--primary-d);}
+  #ansmodal .fakebig{
+    margin:16px auto 6px; display:inline-flex; align-items:center; justify-content:center; gap:10px;
+    background:linear-gradient(135deg,#ef4444,#f97316); color:#fff; border-radius:999px;
+    font-size:30px; font-weight:900; padding:10px 30px; box-shadow:0 6px 20px rgba(239,68,68,.4);
+  }
+  #ansmodal .faketext{font-size:20px; font-weight:800; margin:10px 6px 4px; line-height:1.4;}
+  #ansmodal .realline{
+    background:#f0fdf4; border:1.5px solid #86efac; border-radius:14px; padding:12px 14px;
+    margin:14px 0; font-size:17px; line-height:1.6;
+  }
+  #ansmodal .realline b{color:#166534;}
+  #ansmodal .mine{font-size:22px; font-weight:900; margin:10px 0;}
+  #ansmodal .mine.ok{color:var(--good);} #ansmodal .mine.no{color:var(--bad);}
+  #ansmodal .winwrap{text-align:left; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:14px; padding:12px 14px; margin:12px 0;}
+  #ansmodal .winwrap .wt{font-size:14px; font-weight:900; color:#92400e; margin-bottom:8px; text-align:center;}
+  #ansmodal .winwrap .chips{justify-content:center;}
+  #ansmodal .chip.win{background:#fde68a; color:#78350f; font-size:15px; padding:8px 15px;}
+  #ansmodal .none{text-align:center; color:var(--sub); font-size:14px;}
+  #ansmodal .stat{color:var(--sub); font-size:14px; margin-bottom:14px;}
+
+  /* ── 폭죽 ── */
+  #confetti{position:fixed; inset:0; z-index:95; pointer-events:none; display:none;}
+  #confetti.on{display:block;}
+
+  /* ── 랭킹 ── */
+  .podium{display:flex; align-items:flex-end; justify-content:center; gap:10px; margin:6px 0 18px;}
+  .podium .p{
+    flex:1 1 0; max-width:150px; text-align:center; border-radius:14px 14px 0 0; padding:10px 6px 12px;
+    background:linear-gradient(180deg,#ede9fe,#f5f3ff); border:1.5px solid #ddd6fe; border-bottom:none;
+  }
+  .podium .p .medal{font-size:30px; line-height:1.1;}
+  .podium .p .nm{font-weight:900; font-size:16px; margin-top:2px; word-break:keep-all;}
+  .podium .p .sc{font-size:13px; color:var(--sub); font-weight:700; margin-top:2px;}
+  .podium .p1{height:132px; background:linear-gradient(180deg,#fde68a,#fef3c7); border-color:#fcd34d;}
+  .podium .p2{height:112px;}
+  .podium .p3{height:98px; background:linear-gradient(180deg,#fde4cf,#fff3e9); border-color:#fed7aa;}
+  table.rtab td{font-size:15px;}
+  table.rtab .rk{font-weight:900; color:var(--primary-d);}
+  table.rtab .me{background:#fef3c7;}
+  table.rtab .me td{font-weight:900;}
+  .rbar{height:8px; background:#eef0f7; border-radius:999px; overflow:hidden; margin-top:5px;}
+  .rbar > i{display:block; height:100%; background:var(--primary); border-radius:999px;}
+
+  /* ── BGM 토글 ── */
+  .bgmbtn{
+    background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 14px;
+    font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .bgmbtn.off{opacity:.5;}
 </style>
 </head>
 <body>
@@ -281,6 +363,7 @@
     <div class="topbar">
       <span class="pill">👩‍🏫 진행 <b id="tp-progress"></b></span>
       <span class="pill">방 코드: <b id="tp-code"></b></span>
+      <button class="bgmbtn" id="btn-bgm" title="배경음악 켜기/끄기">🔊 음악</button>
     </div>
     <div class="stage-q">
       <div class="who" id="tp-who"></div>
@@ -296,6 +379,14 @@
       <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
       <button class="btn good" id="btn-next-q">다음 →</button>
     </div>
+    <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 보기</button>
+    <div class="card hidden" id="tp-joincard" style="margin-top:12px">
+      <h2 class="center" style="margin-bottom:6px">📲 늦게 들어오거나 튕긴 학생용</h2>
+      <p class="muted center" style="margin-top:0">QR을 찍고 <b>원래 쓰던 이름 그대로</b> 넣으면 하던 자리로 돌아와요.</p>
+      <div id="tp-qr" class="center"></div>
+      <div class="code-big" id="tp-joincode"></div>
+      <div class="muted center" id="tp-joinurl" style="word-break:break-all"></div>
+    </div>
     <button class="btn warn" id="btn-end-present" style="margin-top:12px">🏁 게임 종료</button>
   </section>
 
@@ -305,6 +396,7 @@
       <span class="pill" id="sp-progress"></span></div>
     <div class="stage-q">
       <div class="who" id="sp-who"></div>
+      <div class="topic" id="sp-topic"></div>
       <div class="ask" id="sp-ask">🤔 가짜를 골라 보세요!</div>
     </div>
     <div class="opts" id="sp-opts"></div>
@@ -316,6 +408,14 @@
   <section id="scr-done" class="screen">
     <h1>🏆 게임 끝!</h1>
     <p class="tagline">모두 수고했어요!</p>
+    <div class="card">
+      <h2>👑 가짜 탐정 랭킹 <span class="muted" style="font-size:13px; font-weight:400">— 가짜를 많이 찾아낸 순서</span></h2>
+      <div id="rank-podium" class="podium"></div>
+      <table class="ptab rtab">
+        <thead><tr><th style="width:64px">순위</th><th>이름</th><th style="width:88px">맞힌 개수</th><th style="width:110px">정답률</th></tr></thead>
+        <tbody id="rank-rows"></tbody>
+      </table>
+    </div>
     <div class="card" id="done-teacher">
       <h2>📊 문제별 결과</h2>
       <table class="ptab">
@@ -332,6 +432,29 @@
 </div>
 
 <div class="flash" id="flash"></div>
+
+<!-- 정답 공개 카운트다운 -->
+<div id="countdown"><div class="num" id="countdown-num">3</div></div>
+
+<!-- 폭죽 -->
+<canvas id="confetti"></canvas>
+
+<!-- 정답 팝업 -->
+<div id="ansmodal">
+  <div class="box">
+    <div class="head">🎉 정답 공개!</div>
+    <div class="fakebig" id="am-fake"></div>
+    <div class="faketext" id="am-faketext"></div>
+    <div class="mine" id="am-mine"></div>
+    <div class="realline" id="am-real"></div>
+    <div class="winwrap" id="am-winwrap">
+      <div class="wt">🏅 정답을 맞힌 친구들</div>
+      <div class="chips" id="am-winners"></div>
+    </div>
+    <div class="stat" id="am-stat"></div>
+    <button class="btn big" id="am-close">확인</button>
+  </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -352,7 +475,7 @@ const FIREBASE_CONFIG = {
 };
 
 const $ = id => document.getElementById(id);
-const NLET = ["A","B","C","D","E"];
+const NUM = ["1","2","3","4","5"];
 
 let db = null;
 const S = {
@@ -393,10 +516,23 @@ async function doCreateRoom(){
 async function joinRoom(code, name){
   const snap = await refFor(code).get();
   if(!snap.exists()){ flash("방을 찾을 수 없어요. 코드를 확인해 주세요!"); return false; }
+  const room = snap.val() || {};
   S.role="student"; S.code=code; S.name=name;
-  const pref = roomRef().child("players").push();
-  S.pid = pref.key;
-  await pref.set({ name, joinedAt: firebase.database.ServerValue.TIMESTAMP, submitted:false });
+
+  /* 이미 같은 이름이 있으면 = 중간에 튕겼다 다시 들어온 학생.
+     새 자리를 만들지 않고 원래 자리(문제·투표·점수)를 그대로 이어받는다. */
+  const players = room.players || {};
+  const mine = Object.entries(players).find(([,p]) => String(p.name||"").trim() === name);
+  if(mine){
+    S.pid = mine[0];
+    await roomRef().child("players/"+S.pid).update({ rejoinedAt: firebase.database.ServerValue.TIMESTAMP });
+    flash("다시 들어왔어요! 하던 데서 이어서 해요 😊");
+  } else {
+    const pref = roomRef().child("players").push();
+    S.pid = pref.key;
+    await pref.set({ name, joinedAt: firebase.database.ServerValue.TIMESTAMP, submitted:false });
+    if((room.state||"writing") !== "writing") flash("중간 입장! 지금 문제부터 같이 맞혀요 🙌");
+  }
   saveSession(); attachRoom();
   return true;
 }
@@ -412,6 +548,7 @@ function attachRoom(){
 function detachRoom(){ if(S.code && db) refFor(S.code).off(); }
 function goHome(){
   detachRoom(); clearSession();
+  BGM.stop(); stopCountdown(); hideAnswerModal(); S.fxKey=null; S.doneFx=false;
   Object.assign(S, {role:null, code:null, pid:null, name:null, room:null, qrDone:false, votedFor:null,
     writeReals:[], writeFakeIdx:null});
   showScreen("scr-home");
@@ -422,6 +559,8 @@ function render(){
   const room = S.room; if(!room) return;
   const state = room.state || "writing";
   const prev = S.prevState; S.prevState = state;
+  if(state!=="presenting"){ BGM.stop(); stopCountdown(); hideAnswerModal(); S.fxKey=null; }
+  if(state!=="done") S.doneFx=false;
   if(S.role==="teacher"){
     if(state==="writing")         { showScreen("scr-lobby");     renderLobby(); }
     else if(state==="presenting") { showScreen("scr-tpresent");  renderTPresent(); }
@@ -438,11 +577,21 @@ function render(){
 }
 
 /* ─────────── 선생님: 대기실 ─────────── */
+function joinUrl(){ return location.origin + location.pathname + "?room=" + S.code; }
+/* 발표 중에도 쓸 수 있는 "중간 입장" QR (방 코드가 바뀔 때만 다시 그림) */
+function ensureJoinQR(){
+  const el = $("tp-qr");
+  if(!el || el.dataset.code === S.code) return;
+  el.dataset.code = S.code; el.innerHTML = "";
+  new QRCode(el, { text:joinUrl(), width:180, height:180, correctLevel:QRCode.CorrectLevel.M });
+  $("tp-joincode").textContent = S.code;
+  $("tp-joinurl").textContent = joinUrl();
+}
 function renderLobby(){
   $("lobby-topic").textContent = S.room.topic || "진진가";
   if(!S.qrDone){
     S.qrDone = true;
-    const url = location.origin + location.pathname + "?room=" + S.code;
+    const url = joinUrl();
     $("qrcode").innerHTML = "";
     new QRCode($("qrcode"), { text:url, width:220, height:220, correctLevel:QRCode.CorrectLevel.M });
     $("lobby-code").textContent = S.code;
@@ -467,7 +616,8 @@ async function startPresenting(){
   const players = S.room.players || {};
   const notDone = Object.values(players).filter(p=>!p.submitted).length;
   if(notDone>0 && !confirm(`아직 ${notDone}명이 작성 중이에요. 지금 발표를 시작할까요?\n(제출한 ${order.length}명의 문제로 진행돼요)`)) return;
-  await roomRef().update({ state:"presenting", present:{ order, idx:0, revealed:false }, votes:null });
+  SFX.init(); // 클릭한 지금 오디오를 열어 둬야 배경음악이 나올 수 있어요
+  await roomRef().update({ state:"presenting", present:{ order, idx:0, revealed:false, countdown:null }, votes:null });
 }
 
 /* ─────────── 선생님: 발표/투표 ─────────── */
@@ -479,6 +629,7 @@ function renderTPresent(){
   const room = S.room, pres = room.present || {order:[],idx:0};
   const owner = currentOwner(), prob = ownerProblem(owner), players = room.players||{};
   $("tp-code").textContent = S.code;
+  ensureJoinQR();
   $("tp-progress").textContent = (pres.idx+1) + " / " + pres.order.length;
   $("tp-who").textContent = "🙋 " + (players[owner]? players[owner].name : "?") + " 님의 문제";
   $("tp-topic").textContent = room.topic ? "주제: "+room.topic : "";
@@ -495,7 +646,7 @@ function renderTPresent(){
     const pct = total? Math.round(counts[i]/total*100):0;
     const tag = revealed ? (i===prob.fakeIndex?'<span class="tag f">가짜!</span>':'<span class="tag r">진짜</span>') : "";
     return `<div class="opt disabled ${cls}">${tag}
-      <div class="lab">${NLET[i]}</div>
+      <div class="lab">${NUM[i]}</div>
       <div class="txt">${esc(t)}
         <div class="votebar-wrap"><div class="votebar"><i style="width:${pct}%"></i></div>
         <div class="votecount">${counts[i]}표 · ${pct}%</div></div>
@@ -505,28 +656,45 @@ function renderTPresent(){
   const voters = countVoters(owner);
   if(revealed){
     const correct = counts[prob.fakeIndex];
-    $("tp-votestatus").innerHTML = `정답은 <b style="color:var(--bad)">${NLET[prob.fakeIndex]}</b> (가짜)! `+
-      `진짜는 <b>"${esc(prob.realValue||"")}"</b> · ${voters}명 중 <b>${correct}명</b> 정답`;
+    const wins = winnerNames(owner, prob.fakeIndex);
+    $("tp-votestatus").innerHTML = `정답은 <b style="color:var(--bad)">${NUM[prob.fakeIndex]}번</b> (가짜)! `+
+      `진짜는 <b>"${esc(prob.realValue||"")}"</b> · ${voters}명 중 <b>${correct}명</b> 정답`+
+      (wins.length ? `<div style="margin-top:8px; font-weight:700; color:var(--sub); font-size:14px">🏅 맞힌 친구: `+
+        wins.map(n=>esc(n)).join(", ")+`</div>` : "");
   } else {
     $("tp-votestatus").textContent = `투표 현황: ${total}명 참여 (학생들이 각자 폰에서 고르는 중)`;
   }
   $("btn-reveal").style.display = revealed ? "none" : "block";
+  $("btn-reveal").disabled = !!pres.countdown;
   $("btn-next-q").textContent = (pres.idx+1>=pres.order.length) ? "🏁 결과 보기" : "다음 →";
   $("btn-prev-q").disabled = pres.idx===0;
+
+  syncFx(pres, owner, prob);
 }
 function countVoters(owner){
   // 문제 주인을 제외한 참여 학생 수는 알 수 없으니 실제 투표수 기준
   return Object.keys(votesFor(owner)).length;
 }
-async function revealAnswer(){ await roomRef().child("present/revealed").set(true); }
+function winnerNames(owner, fakeIndex){
+  const votes = votesFor(owner), players = S.room.players||{};
+  return Object.entries(votes)
+    .filter(([,c])=>c===fakeIndex)
+    .map(([pid])=> players[pid] ? players[pid].name : "?");
+}
+/* 정답 공개 = 3·2·1 카운트다운 시작 신호를 방에 기록 → 모든 기기가 함께 카운트다운 */
+async function revealAnswer(){
+  SFX.init();
+  $("btn-reveal").disabled = true;
+  await roomRef().child("present/countdown").set(Date.now());
+}
 async function nextProblem(){
   const p=S.room.present, ni=p.idx+1;
   if(ni>=p.order.length){ await roomRef().update({ state:"done" }); }
-  else await roomRef().update({ "present/idx":ni, "present/revealed":false });
+  else await roomRef().update({ "present/idx":ni, "present/revealed":false, "present/countdown":null });
 }
 async function prevProblem(){
   const p=S.room.present; if(p.idx<=0) return;
-  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false });
+  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false, "present/countdown":null });
 }
 async function endPresent(){ if(confirm("게임을 종료하고 결과를 볼까요?")) await roomRef().update({ state:"done" }); }
 
@@ -537,6 +705,7 @@ function renderSPresent(){
   $("sp-name").textContent = S.name;
   $("sp-progress").textContent = (pres.idx+1)+" / "+pres.order.length;
   $("sp-who").textContent = "🙋 "+(players[owner]?players[owner].name:"?")+" 님의 문제";
+  $("sp-topic").textContent = room.topic ? "주제: "+room.topic : "";
   if(!prob){ $("sp-opts").innerHTML=""; return; }
   const revealed = !!pres.revealed;
   const isOwner = owner===S.pid;
@@ -555,7 +724,7 @@ function renderSPresent(){
     let extra="";
     if(revealed){ const pct=total?Math.round(counts[i]/total*100):0;
       extra=`<div class="votebar-wrap"><div class="votebar"><i style="width:${pct}%"></i></div><div class="votecount">${counts[i]}표</div></div>`; }
-    return `<div class="opt ${cls} ${dis}" data-i="${i}"><div class="lab">${NLET[i]}</div><div class="txt">${esc(t)}${extra}</div>${tag}</div>`;
+    return `<div class="opt ${cls} ${dis}" data-i="${i}"><div class="lab">${NUM[i]}</div><div class="txt">${esc(t)}${extra}</div>${tag}</div>`;
   }).join("");
 
   if(!revealed && !isOwner){
@@ -575,15 +744,19 @@ function renderSPresent(){
     if(isOwner) head = "";
     else if(myVote==null) head = "";
     else head = mine ? "🎉 <b>정답!</b> " : "❌ 아쉬워요. ";
-    rb.innerHTML = `${head}가짜는 <b>${NLET[prob.fakeIndex]}</b> 였어요.<br>`+
-      `진짜 사실: <b>"${esc(prob.realValue||"")}"</b><br><span class="muted">${total}명 중 ${correct}명이 맞혔어요.</span>`;
+    const wins = winnerNames(owner, prob.fakeIndex);
+    rb.innerHTML = `${head}가짜는 <b>${NUM[prob.fakeIndex]}번</b> 이었어요.<br>`+
+      `진짜 사실: <b>"${esc(prob.realValue||"")}"</b><br><span class="muted">${total}명 중 ${correct}명이 맞혔어요.</span>`+
+      (wins.length? `<br><span class="muted">🏅 ${wins.map(n=>esc(n)).join(", ")}</span>`:"");
   } else rb.classList.add("hidden");
+
+  syncFx(pres, owner, prob);
 }
 async function castVote(i){
   const owner=currentOwner(); if(!owner||owner===S.pid) return;
-  if(S.room.present.revealed) return;
+  if(S.room.present.revealed || S.room.present.countdown) return;
   await roomRef().child("votes/"+owner+"/"+S.pid).set(i);
-  flash("선택: "+NLET[i]);
+  flash("선택: "+NUM[i]+"번");
 }
 
 /* ─────────── 학생: 대기 ─────────── */
@@ -674,6 +847,55 @@ async function editProblem(){
 }
 
 /* ─────────── 결과 ─────────── */
+/* 학생별로 "가짜를 맞힌 횟수"를 모아 랭킹을 만든다 (자기 문제는 투표를 안 하니 자동 제외) */
+function computeRanking(){
+  const room=S.room, pres=room.present||{order:[]}, probs=room.problems||{},
+        players=room.players||{}, votes=room.votes||{};
+  const stat={};
+  (pres.order||[]).forEach(owner=>{
+    const prob=probs[owner]; if(!prob) return;
+    Object.entries(votes[owner]||{}).forEach(([pid,c])=>{
+      const s = stat[pid] || (stat[pid]={correct:0, answered:0});
+      s.answered++; if(c===prob.fakeIndex) s.correct++;
+    });
+  });
+  const list = Object.entries(stat).map(([pid,s])=>({
+    pid, name: players[pid]?players[pid].name:"?", correct:s.correct, answered:s.answered,
+    rate: s.answered? s.correct/s.answered : 0
+  }));
+  list.sort((a,b)=> b.correct-a.correct || b.rate-a.rate || String(a.name).localeCompare(String(b.name)));
+  // 동점자는 같은 등수
+  let rank=0, prevKey=null;
+  list.forEach((r,i)=>{
+    const key = r.correct+"/"+r.answered;
+    if(key!==prevKey){ rank=i+1; prevKey=key; }
+    r.rank=rank;
+  });
+  return list;
+}
+const MEDAL = {1:"🥇", 2:"🥈", 3:"🥉"};
+function renderRanking(){
+  const list = computeRanking();
+  // 시상대: 위쪽 3명을 2등–1등–3등 자리에 배치 (동점이면 메달은 같은 걸 달아 줌)
+  const top = list.slice(0,3);
+  const slots = [top[1], top[0], top[2]].map((r,i)=> r ? {r, slot:[2,1,3][i]} : null);
+  $("rank-podium").innerHTML = list.length
+    ? slots.filter(Boolean).map(({r,slot})=>
+        `<div class="p p${slot}"><div class="medal">${MEDAL[r.rank]||"🎖️"}</div>
+         <div class="nm">${esc(r.name)}</div><div class="sc">${r.correct}개</div></div>`).join("")
+    : "";
+  $("rank-rows").innerHTML = list.length
+    ? list.map(r=>{
+        const pct = Math.round(r.rate*100);
+        const me = (S.role==="student" && r.pid===S.pid) ? " me" : "";
+        return `<tr class="${me}">
+          <td class="rk">${MEDAL[r.rank] || (r.rank+"위")}</td>
+          <td>${esc(r.name)}${me?" (나)":""}</td>
+          <td><b>${r.correct}</b> / ${r.answered}</td>
+          <td>${pct}%<div class="rbar"><i style="width:${pct}%"></i></div></td></tr>`;
+      }).join("")
+    : `<tr><td colspan="4" class="muted">투표 기록이 없어요</td></tr>`;
+}
 function renderDone(){
   const room=S.room, pres=room.present||{order:[]}, players=room.players||{}, probs=room.problems||{};
   $("done-teacher").style.display = "block";
@@ -683,12 +905,16 @@ function renderDone(){
     const correct=Object.values(v).filter(c=>c===prob.fakeIndex).length;
     const pct = total?Math.round(correct/total*100):0;
     return `<tr><td><b>${esc(players[owner]?players[owner].name:"?")}</b></td>
-      <td><span class="badge-fake">${NLET[prob.fakeIndex]}</span> ${esc(prob.realValue||"")}</td>
+      <td><span class="badge-fake">${NUM[prob.fakeIndex]}번</span> ${esc(prob.realValue||"")}</td>
       <td>${total?`${correct}/${total} (${pct}%)`:"-"}</td></tr>`;
   }).join("");
   $("done-rows").innerHTML = rows || `<tr><td colspan="3" class="muted">문제가 없어요</td></tr>`;
   $("done-teacher-btns").style.display = S.role==="teacher"?"block":"none";
   $("done-student-msg").style.display  = S.role==="student"?"block":"none";
+  renderRanking();
+
+  // 결과 화면에 처음 들어올 때 한 번만 축하 효과
+  if(!S.doneFx){ S.doneFx=true; SFX.fanfare(); Confetti.burst(); }
 }
 async function playAgain(){
   const players=S.room.players||{};
@@ -700,6 +926,244 @@ async function playAgain(){
 async function closeRoom(){
   if(!confirm("방을 닫을까요? 학생들도 모두 나가게 돼요.")) return;
   await roomRef().remove(); goHome();
+}
+
+/* ════════════════════════════════════════════════════════════
+   🔊 소리 (WebAudio로 직접 만들어서 외부 음원 파일이 필요 없음)
+   교실이 시끄러워지지 않도록 소리는 선생님 화면에서만 납니다.
+   ════════════════════════════════════════════════════════════ */
+const SFX = {
+  ctx:null,
+  canSound(){ return S.role==="teacher"; },
+  init(){
+    if(!this.ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return null;
+      this.ctx = new AC();
+    }
+    if(this.ctx.state==="suspended") this.ctx.resume();
+    return this.ctx;
+  },
+  tone(freq, at, dur, type, vol, dest){
+    const c=this.ctx; if(!c) return;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=type||"triangle"; o.frequency.value=freq;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, at+dur);
+    o.connect(g); g.connect(dest||c.destination);
+    o.start(at); o.stop(at+dur+0.05);
+  },
+  /* 카운트다운 "삑" */
+  tick(n){
+    if(!this.canSound() || !this.init()) return;
+    const t=this.ctx.currentTime;
+    this.tone(440 + (3-n)*110, t, 0.18, "square", 0.16);
+  },
+  /* 정답 공개 팡파레 */
+  fanfare(){
+    if(!this.canSound() || !this.init()) return;
+    const t=this.ctx.currentTime;
+    [0,0.11,0.22,0.36].forEach((d,i)=>{
+      const f=[523.25,659.25,783.99,1046.5][i];
+      this.tone(f, t+d, i===3?0.9:0.22, "triangle", 0.22);
+      this.tone(f/2, t+d, i===3?0.9:0.22, "sine", 0.12);
+    });
+    // 폭죽 터지는 소리 (노이즈 버스트)
+    const c=this.ctx, len=Math.floor(c.sampleRate*0.5);
+    const buf=c.createBuffer(1,len,c.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+    const src=c.createBufferSource(); src.buffer=buf;
+    const hp=c.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=900;
+    const g=c.createGain(); g.gain.value=0.25;
+    src.connect(hp); hp.connect(g); g.connect(c.destination);
+    src.start(t+0.02);
+  }
+};
+
+/* ─────────── 배경음악 (신나는 4마디 루프) ─────────── */
+const BGM = {
+  on:true, playing:false, timer:null, next:0, gain:null,
+  BEAT:60/128, // 128 BPM
+  mf(m){ return 440*Math.pow(2,(m-69)/12); },
+  CHORDS:[ [72,76,79], [69,72,76], [65,69,72], [67,71,74] ], // C - Am - F - G
+  BASS:[48,45,41,43],
+  PATTERN:[ [0,1,2,1,0,2,1,2], [0,2,1,2,0,1,2,1], [0,1,2,1,2,1,0,1], [0,2,1,0,1,2,1,2] ],
+  ensure(){
+    const c=SFX.init(); if(!c) return null;
+    if(!this.gain){ this.gain=c.createGain(); this.gain.gain.value=0.09; this.gain.connect(c.destination); }
+    return c;
+  },
+  scheduleLoop(t0){
+    const c=SFX.ctx, e=this.BEAT/2; // 8분음표
+    this.CHORDS.forEach((ch,bar)=>{
+      const bt = t0 + bar*this.BEAT*4;
+      // 베이스
+      [0,2].forEach(b=> SFX.tone(this.mf(this.BASS[bar]), bt+b*this.BEAT, 0.45, "sine", 0.5, this.gain));
+      // 멜로디 아르페지오
+      this.PATTERN[bar].forEach((idx,k)=>{
+        SFX.tone(this.mf(ch[idx]), bt+k*e, 0.2, "triangle", 0.34, this.gain);
+        if(k%4===0) SFX.tone(this.mf(ch[idx]+12), bt+k*e, 0.14, "sine", 0.12, this.gain);
+      });
+    });
+  },
+  loopLen(){ return this.BEAT*4*4; },
+  play(){
+    if(!this.on || this.playing || !SFX.canSound()) return;
+    if(!this.ensure()) return;
+    this.playing=true;
+    this.next = SFX.ctx.currentTime + 0.1;
+    const step=()=>{
+      if(!this.playing) return;
+      if(this.next < SFX.ctx.currentTime+0.05) this.next = SFX.ctx.currentTime+0.05;
+      this.scheduleLoop(this.next);
+      this.next += this.loopLen();
+      this.timer = setTimeout(step, this.loopLen()*1000 - 150);
+    };
+    step();
+  },
+  stop(){
+    this.playing=false;
+    clearTimeout(this.timer); this.timer=null;
+    if(this.gain && SFX.ctx){
+      const t=SFX.ctx.currentTime;
+      this.gain.gain.cancelScheduledValues(t);
+      this.gain.gain.setValueAtTime(this.gain.gain.value, t);
+      this.gain.gain.linearRampToValueAtTime(0.0001, t+0.25);
+      setTimeout(()=>{ if(!this.playing && this.gain) this.gain.gain.value=0.09; }, 400);
+    }
+  },
+  toggle(){
+    this.on=!this.on;
+    const b=$("btn-bgm");
+    b.textContent = this.on ? "🔊 음악" : "🔇 음악";
+    b.classList.toggle("off", !this.on);
+    if(this.on){ const p=S.room && S.room.present; if(p && !p.revealed && !p.countdown) this.play(); }
+    else this.stop();
+  }
+};
+
+/* ─────────── 🎆 폭죽 ─────────── */
+const Confetti = {
+  cv:null, ctx:null, parts:[], raf:null, until:0,
+  COLORS:["#f59e0b","#ef4444","#10b981","#6d28d9","#3b82f6","#ec4899","#facc15"],
+  burst(){
+    this.cv = this.cv || $("confetti");
+    this.ctx = this.ctx || this.cv.getContext("2d");
+    const w=this.cv.width=window.innerWidth, h=this.cv.height=window.innerHeight;
+    this.cv.classList.add("on");
+    this.parts=[];
+    const sources=[[w*0.2,h*0.75],[w*0.8,h*0.75],[w*0.5,h*0.55]];
+    sources.forEach(([sx,sy])=>{
+      for(let i=0;i<60;i++){
+        const a=-Math.PI/2 + (Math.random()-0.5)*1.7, sp=6+Math.random()*11;
+        this.parts.push({
+          x:sx, y:sy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+          s:5+Math.random()*7, r:Math.random()*Math.PI, vr:(Math.random()-0.5)*0.35,
+          c:this.COLORS[(Math.random()*this.COLORS.length)|0]
+        });
+      }
+    });
+    this.until = performance.now()+2800;
+    if(!this.raf) this.tick();
+  },
+  tick(){
+    const now=performance.now(), c=this.ctx;
+    c.clearRect(0,0,this.cv.width,this.cv.height);
+    this.parts.forEach(p=>{
+      p.vy += 0.28; p.vx *= 0.995; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      c.save(); c.translate(p.x,p.y); c.rotate(p.r); c.fillStyle=p.c;
+      c.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.6); c.restore();
+    });
+    this.parts = this.parts.filter(p=>p.y < this.cv.height+40);
+    if(now < this.until && this.parts.length){ this.raf = requestAnimationFrame(()=>this.tick()); }
+    else { this.stop(); }
+  },
+  stop(){
+    if(this.raf) cancelAnimationFrame(this.raf);
+    this.raf=null; this.parts=[];
+    if(this.ctx) this.ctx.clearRect(0,0,this.cv.width,this.cv.height);
+    if(this.cv) this.cv.classList.remove("on");
+  }
+};
+
+/* ─────────── 3·2·1 카운트다운 & 정답 팝업 ─────────── */
+let cdTimers=[];
+function stopCountdown(){
+  cdTimers.forEach(clearTimeout); cdTimers=[];
+  $("countdown").classList.remove("on");
+}
+function runCountdown(done){
+  stopCountdown();
+  BGM.stop();
+  const box=$("countdown"), num=$("countdown-num");
+  box.classList.add("on");
+  [3,2,1].forEach((n,i)=>{
+    cdTimers.push(setTimeout(()=>{
+      num.textContent = n;
+      num.style.animation="none"; void num.offsetWidth; num.style.animation="";
+      SFX.tick(n);
+    }, i*800));
+  });
+  cdTimers.push(setTimeout(()=>{ box.classList.remove("on"); done && done(); }, 2400));
+}
+
+function showAnswerModal(owner, prob){
+  if(!prob) return;
+  const room=S.room, players=room.players||{};
+  const votes=votesFor(owner), total=Object.keys(votes).length;
+  const fi=prob.fakeIndex;
+  const correct=Object.values(votes).filter(c=>c===fi).length;
+  const wins=winnerNames(owner, fi);
+
+  $("am-fake").textContent = "정답은 "+NUM[fi]+"번!";
+  $("am-faketext").innerHTML = `“${esc(prob.items[fi]||"")}”`;
+  $("am-real").innerHTML = `사실은 → <b>“${esc(prob.realValue||"")}”</b>`;
+
+  const mineEl=$("am-mine");
+  const myVote=(votes||{})[S.pid];
+  if(S.role==="student" && owner!==S.pid && myVote!=null){
+    const ok = myVote===fi;
+    mineEl.className = "mine "+(ok?"ok":"no");
+    mineEl.textContent = ok ? "🎉 정답이에요!" : "❌ 아쉬워요…";
+    mineEl.style.display="block";
+  } else if(S.role==="student" && owner===S.pid){
+    mineEl.className="mine"; mineEl.textContent="🌟 내가 낸 문제였어요!"; mineEl.style.display="block";
+  } else mineEl.style.display="none";
+
+  $("am-winners").innerHTML = wins.length
+    ? wins.map(n=>`<span class="chip win">🏅 ${esc(n)}</span>`).join("")
+    : `<div class="none">아쉽지만 맞힌 친구가 없어요 😮</div>`;
+  $("am-stat").textContent = total ? `${total}명 중 ${correct}명 정답 (${Math.round(correct/total*100)}%)` : "투표한 친구가 없어요";
+
+  $("ansmodal").classList.add("on");
+  SFX.fanfare();
+  Confetti.burst();
+}
+function hideAnswerModal(){ $("ansmodal").classList.remove("on"); Confetti.stop(); }
+
+/* 문제 상태에 맞춰 음악·카운트다운·팝업을 맞춰 주는 함수 (선생님/학생 공통) */
+function syncFx(pres, owner, prob){
+  const key = pres.idx+"|"+owner;
+  if(S.fxKey !== key){           // 다른 문제로 넘어가면 전부 초기화
+    S.fxKey=key; S.cdSeen=null; S.revealSeen=false;
+    stopCountdown(); hideAnswerModal();
+  }
+  const cd = pres.countdown || 0;
+
+  if(!pres.revealed && cd && S.cdSeen!==cd){
+    S.cdSeen = cd;
+    runCountdown(()=>{ if(S.role==="teacher") roomRef().child("present/revealed").set(true); });
+  }
+  if(pres.revealed){
+    if(!S.revealSeen){ S.revealSeen=true; stopCountdown(); showAnswerModal(owner, prob); }
+  } else {
+    S.revealSeen=false;
+  }
+
+  if(S.role==="teacher"){
+    if(!pres.revealed && !cd) BGM.play(); else BGM.stop();
+  }
 }
 
 /* ─────────── 이벤트 연결 ─────────── */
@@ -738,6 +1202,15 @@ function wire(){
   $("btn-end-present").onclick = endPresent;
   $("btn-again").onclick = playAgain;
   $("btn-home2").onclick = goHome;
+
+  $("btn-toggle-joinqr").onclick = ()=>{
+    const c=$("tp-joincard"), hidden=c.classList.toggle("hidden");
+    $("btn-toggle-joinqr").textContent = hidden ? "📲 중간 입장 QR 보기" : "📲 중간 입장 QR 숨기기";
+    if(!hidden) c.scrollIntoView({behavior:"smooth", block:"nearest"});
+  };
+  $("btn-bgm").onclick = ()=>{ SFX.init(); BGM.toggle(); };
+  $("am-close").onclick = hideAnswerModal;
+  $("ansmodal").addEventListener("click", e=>{ if(e.target.id==="ansmodal") hideAnswerModal(); });
 }
 
 /* ─────────── 시작 ─────────── */
