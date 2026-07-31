@@ -210,6 +210,47 @@
   #confetti{position:fixed; inset:0; z-index:95; pointer-events:none; display:none;}
   #confetti.on{display:block;}
 
+  /* 2단계에서 진짜 입력칸 잠금 (화면 값과 제출 값이 어긋나는 것 방지) */
+  #write-inputs.locked input{background:#f1f5f9; color:var(--sub); border-style:dashed; cursor:not-allowed;}
+  .lockmsg{
+    background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:12px;
+    padding:10px 12px; margin-top:10px; font-size:13px; color:var(--sub); line-height:1.6;
+  }
+
+  /* ── 타이머 ── */
+  .bigtime{
+    font-size:52px; font-weight:900; text-align:center; letter-spacing:2px;
+    color:var(--primary-d); margin:2px 0 14px; font-variant-numeric:tabular-nums;
+  }
+  .bigtime.warn{color:var(--accent);}
+  .bigtime.over{color:var(--bad);}
+  .secbox{
+    text-align:center; font-size:26px; font-weight:900; color:var(--primary-d);
+    background:var(--soft); border-radius:12px; padding:12px 6px; font-variant-numeric:tabular-nums;
+  }
+  .btn.offstate{background:#9ca3af;}
+  /* 학생 작성 화면 상단 고정 타이머 */
+  .wtimer{
+    position:sticky; top:0; z-index:30; margin:0 0 12px;
+    background:#fff; border:2px solid var(--primary); border-radius:14px;
+    padding:10px 14px; text-align:center; font-size:17px; font-weight:800; color:var(--primary-d);
+    box-shadow:0 4px 14px rgba(109,40,217,.15);
+  }
+  .wtimer b{font-size:24px; font-variant-numeric:tabular-nums;}
+  .wtimer.warn{border-color:var(--accent); color:#92400e; background:#fffbeb;}
+  .wtimer.over{border-color:var(--bad); color:#fff; background:var(--bad); animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.55;}}
+  /* 문제별 제한시간 바 */
+  .qtimer{margin:0 0 12px;}
+  .qtimer .qt-top{text-align:center; font-size:15px; font-weight:800; color:var(--sub); margin-bottom:6px;}
+  .qtimer .qt-top b{font-size:22px; color:var(--primary-d); font-variant-numeric:tabular-nums;}
+  .qtimer .qt-bar{height:12px; background:#eef0f7; border-radius:999px; overflow:hidden;}
+  .qtimer .qt-bar > i{display:block; height:100%; width:100%; background:var(--good); border-radius:999px; transition:width .25s linear;}
+  .qtimer.warn .qt-top b{color:var(--accent);}
+  .qtimer.warn .qt-bar > i{background:var(--accent);}
+  .qtimer.hurry .qt-top b{color:var(--bad);}
+  .qtimer.hurry .qt-bar > i{background:var(--bad);}
+
   /* ── 랭킹 ── */
   .podium{display:flex; align-items:flex-end; justify-content:center; gap:10px; margin:6px 0 18px;}
   .podium .p{
@@ -304,6 +345,31 @@
       <h2>✍️ 작성 현황 — <span id="lobby-progress" style="color:var(--primary)">0 / 0</span> 완료</h2>
       <div class="chips" id="lobby-players"><span class="muted">아직 입장한 학생이 없어요...</span></div>
     </div>
+    <div class="card">
+      <h2>⏱️ 문제 작성 시간</h2>
+      <div class="bigtime" id="wt-display">05:00</div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn secondary" id="wt-minus">− 1분</button>
+        <button class="btn secondary" id="wt-plus">+ 1분</button>
+      </div>
+      <div class="row">
+        <button class="btn good" id="wt-start">▶️ 시작</button>
+        <button class="btn secondary" id="wt-reset" style="flex:0 0 100px">↺ 리셋</button>
+      </div>
+      <div class="muted center" style="margin-top:8px" id="wt-hint">학생 화면 위에도 남은 시간이 똑같이 보여요.</div>
+    </div>
+
+    <div class="card">
+      <h2>⏳ 문제별 자동 제한시간</h2>
+      <p class="muted" style="margin-top:0">발표할 때 한 문제당 이 시간이 지나면 <b>자동으로 정답이 공개</b>돼요.</p>
+      <div class="row" style="align-items:center">
+        <button class="btn secondary" id="al-minus" style="flex:0 0 78px">− 5초</button>
+        <div class="secbox" id="al-value">20초</div>
+        <button class="btn secondary" id="al-plus" style="flex:0 0 78px">+ 5초</button>
+      </div>
+      <button class="btn good" id="al-toggle" style="margin-top:12px">⏳ 자동 제한시간 켜짐</button>
+    </div>
+
     <button class="btn big good" id="btn-start-present">🎬 발표 시작하기</button>
     <div class="muted center" style="margin-top:8px">제출을 마친 학생들의 문제부터 순서대로 보여줘요.</div>
   </section>
@@ -323,10 +389,12 @@
   <section id="scr-write" class="screen">
     <div class="topbar"><span class="pill">🙋 <span id="write-name"></span></span>
       <span class="pill">주제: <b id="write-topic"></b></span></div>
+    <div class="wtimer hidden" id="sw-timer"><span id="sw-timer-label">⏱️ 남은 시간</span> <b id="sw-timer-num">05:00</b></div>
     <div class="card">
       <h2>1️⃣ 진짜 사실 5가지를 적어요</h2>
       <p class="muted" style="margin-top:0">모두 <b>진짜</b>로 적으세요. 이 중 하나만 나중에 가짜로 바꿀 거예요.</p>
       <div id="write-inputs"></div>
+      <div class="lockmsg hidden" id="write-lockmsg">🔒 2단계로 넘어와서 잠겼어요. 고치려면 아래 <b>「← 사실 다시 고치기」</b>를 눌러요.</div>
     </div>
     <div class="card" id="write-step2hint">
       <button class="btn big" id="btn-to-fake">2️⃣ 다음: 가짜로 만들 항목 고르기</button>
@@ -370,6 +438,10 @@
       <div class="topic" id="tp-topic"></div>
       <div class="ask">🤔 이 중에서 <b>가짜</b>는 무엇일까요?</div>
     </div>
+    <div class="qtimer hidden" id="tp-timer">
+      <div class="qt-top">⏳ <b id="tp-timer-num">20</b>초 남았어요</div>
+      <div class="qt-bar"><i id="tp-timer-bar"></i></div>
+    </div>
     <div class="opts" id="tp-opts"></div>
     <div class="card" style="margin-top:14px; padding:14px 16px">
       <div id="tp-votestatus" class="center" style="font-weight:800"></div>
@@ -399,6 +471,10 @@
       <div class="topic" id="sp-topic"></div>
       <div class="ask" id="sp-ask">🤔 가짜를 골라 보세요!</div>
     </div>
+    <div class="qtimer hidden" id="sp-timer">
+      <div class="qt-top">⏳ <b id="sp-timer-num">20</b>초 남았어요</div>
+      <div class="qt-bar"><i id="sp-timer-bar"></i></div>
+    </div>
     <div class="opts" id="sp-opts"></div>
     <div class="center muted" id="sp-hint" style="margin-top:14px"></div>
     <div class="reveal-box hidden" id="sp-reveal"></div>
@@ -419,7 +495,7 @@
     <div class="card" id="done-teacher">
       <h2>📊 문제별 결과</h2>
       <table class="ptab">
-        <thead><tr><th>문제</th><th>정답(가짜)</th><th>맞힌 비율</th></tr></thead>
+        <thead><tr><th>문제</th><th>가짜 → 진짜</th><th style="width:92px">맞힌 비율</th></tr></thead>
         <tbody id="done-rows"></tbody>
       </table>
     </div>
@@ -501,6 +577,133 @@ function refFor(code){ return db.ref("rooms/JJG_"+code); }
 function saveSession(){ sessionStorage.setItem("jjg-session", JSON.stringify({role:S.role, code:S.code, pid:S.pid, name:S.name})); }
 function clearSession(){ sessionStorage.removeItem("jjg-session"); }
 
+/* ════════════════════════════════════════════════════════════
+   ⏱️ 타이머 — 기기마다 시계가 다를 수 있으니 서버 시각으로 맞춘다
+   ════════════════════════════════════════════════════════════ */
+let SRV_OFFSET = 0;                       // 서버시각 - 내 기기 시각
+function srvNow(){ return Date.now() + SRV_OFFSET; }
+const DEF_WRITE_SEC = 300;                // 작성 시간 기본 5분
+const DEF_LIMIT_SEC = 20;                 // 문제별 제한시간 기본 20초
+function fmtMS(sec){
+  sec = Math.max(0, Math.ceil(sec));
+  return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+}
+function wtOf(){
+  const t = (S.room && S.room.writeTimer) || {};
+  const dur = t.dur || DEF_WRITE_SEC;
+  return { dur, remain: (t.remain==null? dur : t.remain), running: !!t.running, endsAt: t.endsAt || null };
+}
+function wtRemain(){
+  const t = wtOf();
+  return t.running && t.endsAt ? Math.max(0,(t.endsAt-srvNow())/1000) : Math.max(0, t.remain);
+}
+function wtStarted(){ const t=wtOf(); return t.running || t.remain < t.dur; }
+function limitOf(){
+  const st = (S.room && S.room.settings) || {};
+  return { on: st.autoOn !== false, sec: st.limitSec || DEF_LIMIT_SEC };
+}
+
+/* 선생님만 쓰는 조작 */
+async function wtToggle(){
+  SFX.init();
+  const t = wtOf();
+  if(t.running){
+    await roomRef().child("writeTimer").update({ running:false, endsAt:null, remain: wtRemain(), dur:t.dur });
+  }else{
+    const r = t.remain > 0 ? t.remain : t.dur;
+    await roomRef().child("writeTimer").update({ running:true, endsAt: srvNow()+r*1000, remain:r, dur:t.dur });
+  }
+}
+async function wtAdjust(delta){
+  const t = wtOf();
+  const dur = Math.min(1800, Math.max(60, t.dur + delta));
+  if(t.running){
+    const nr = Math.max(5, wtRemain() + delta);          // 진행 중이면 남은 시간에 바로 더하기/빼기
+    await roomRef().child("writeTimer").update({ dur, remain:nr, endsAt: srvNow()+nr*1000, running:true });
+  }else{
+    await roomRef().child("writeTimer").update({ dur, remain: Math.max(0, t.remain + delta), endsAt:null, running:false });
+  }
+}
+async function wtReset(){
+  const t = wtOf();
+  await roomRef().child("writeTimer").update({ running:false, endsAt:null, remain:t.dur, dur:t.dur });
+}
+async function alAdjust(delta){
+  const l = limitOf();
+  await roomRef().child("settings").update({ autoOn:l.on, limitSec: Math.min(180, Math.max(5, l.sec+delta)) });
+}
+async function alToggle(){
+  const l = limitOf();
+  await roomRef().child("settings").update({ autoOn: !l.on, limitSec: l.sec });
+}
+
+/* 화면 갱신 */
+function renderWTControls(){
+  const t = wtOf(), rem = wtRemain(), el = $("wt-display");
+  el.textContent = fmtMS(rem);
+  el.classList.toggle("warn", rem<=60 && rem>0);
+  el.classList.toggle("over", rem<=0);
+  $("wt-start").textContent = t.running ? "⏸️ 멈춤" : (wtStarted() && rem>0 ? "▶️ 이어서" : "▶️ 시작");
+  $("wt-hint").textContent = rem<=0 && wtStarted()
+    ? "시간이 끝났어요! 학생 화면에도 표시돼요."
+    : "학생 화면 위에도 남은 시간이 똑같이 보여요.";
+}
+function renderALControls(){
+  const l = limitOf();
+  $("al-value").textContent = l.sec + "초";
+  const b = $("al-toggle");
+  b.textContent = l.on ? "⏳ 자동 제한시간 켜짐" : "🚫 자동 제한시간 꺼짐 (선생님이 직접 공개)";
+  b.classList.toggle("offstate", !l.on);
+  $("al-minus").disabled = !l.on;
+  $("al-plus").disabled  = !l.on;
+}
+function renderWriteTimer(){
+  const bar = $("sw-timer");
+  if(!wtStarted()){ bar.classList.add("hidden"); return; }
+  const rem = wtRemain();
+  bar.classList.remove("hidden");
+  $("sw-timer-num").textContent = fmtMS(rem);
+  $("sw-timer-label").textContent = rem<=0 ? "⏰ 시간 종료! 얼른 제출해 주세요" : "⏱️ 남은 시간";
+  bar.classList.toggle("warn", rem<=60 && rem>0);
+  bar.classList.toggle("over", rem<=0);
+}
+/* 발표 중 문제별 제한시간 바 (선생님·학생 공통) */
+function renderQTimer(){
+  const pres = S.room.present || {}, l = limitOf(), isT = S.role==="teacher";
+  const bar = $(isT ? "tp-timer" : "sp-timer");
+  if(!bar) return;
+  if(!(l.on && !pres.revealed && !pres.countdown && pres.deadline)){ bar.classList.add("hidden"); return; }
+  const rem = Math.max(0,(pres.deadline - srvNow())/1000), left = Math.ceil(rem);
+  bar.classList.remove("hidden");
+  $(isT ? "tp-timer-num" : "sp-timer-num").textContent = left;
+  $(isT ? "tp-timer-bar" : "sp-timer-bar").style.width = Math.min(100, Math.max(0, rem/l.sec*100)) + "%";
+  bar.classList.toggle("warn", rem<=10 && rem>5);
+  bar.classList.toggle("hurry", rem<=5);
+  if(isT && left<=5 && left>0 && S.lastBeep!==left){ S.lastBeep=left; SFX.beep(); }
+  if(isT && rem<=0 && !S.autoFiring){          // 시간 끝 → 자동으로 3·2·1 공개
+    S.autoFiring = true;
+    Promise.resolve(revealAnswer()).finally(()=>{ S.autoFiring=false; });
+  }
+}
+/* 0.25초마다 남은 시간 갱신 */
+function timerTick(){
+  if(!S.room) return;
+  const state = S.room.state || "writing";
+  if(state==="writing"){
+    if(S.role==="teacher") renderWTControls();
+    else if(S.screen==="scr-write") renderWriteTimer();
+    const rem = wtRemain();
+    if(rem>0){ S.wtAlarm=false; }
+    else if(wtOf().running && !S.wtAlarm){        // 0초 도달은 딱 한 번만 처리
+      S.wtAlarm = true;
+      if(S.role==="teacher") roomRef().child("writeTimer").update({ running:false, endsAt:null, remain:0 });
+      SFX.alarm(); flash("작성 시간이 끝났어요!");
+    }
+  } else if(state==="presenting"){
+    renderQTimer();
+  }
+}
+
 /* ─────────── 방 만들기 / 입장 ─────────── */
 async function doCreateRoom(){
   const topic = $("in-topic").value.trim();
@@ -509,6 +712,8 @@ async function doCreateRoom(){
   await roomRef().set({
     createdAt: firebase.database.ServerValue.TIMESTAMP,
     state:"writing", topic,
+    writeTimer:{ dur:DEF_WRITE_SEC, remain:DEF_WRITE_SEC, running:false, endsAt:null },
+    settings:{ autoOn:true, limitSec:DEF_LIMIT_SEC },
   });
   saveSession(); attachRoom();
 }
@@ -604,6 +809,7 @@ function renderLobby(){
   $("lobby-players").innerHTML = list.length
     ? list.map(([,p])=>`<span class="chip ${p.submitted?"done":"writing"}">${esc(p.name)} ${p.submitted?"✅":"✍️"}</span>`).join("")
     : '<span class="muted">아직 입장한 학생이 없어요...</span>';
+  renderWTControls(); renderALControls();
   $("btn-start-present").disabled = done===0;
   $("btn-start-present").textContent = done===0 ? "제출한 학생을 기다려요..."
     : (done<list.length ? `🎬 발표 시작 (${done}명 제출됨, ${list.length-done}명 아직)` : "🎬 발표 시작하기 (전원 완료!)");
@@ -617,7 +823,12 @@ async function startPresenting(){
   const notDone = Object.values(players).filter(p=>!p.submitted).length;
   if(notDone>0 && !confirm(`아직 ${notDone}명이 작성 중이에요. 지금 발표를 시작할까요?\n(제출한 ${order.length}명의 문제로 진행돼요)`)) return;
   SFX.init(); // 클릭한 지금 오디오를 열어 둬야 배경음악이 나올 수 있어요
-  await roomRef().update({ state:"presenting", present:{ order, idx:0, revealed:false, countdown:null }, votes:null });
+  await roomRef().update({
+    state:"presenting",
+    present:{ order, idx:0, revealed:false, countdown:null, deadline:null },
+    votes:null,
+    writeTimer:{ ...wtOf(), running:false, endsAt:null, remain:wtOf().dur }   // 작성 타이머는 멈춰 둔다
+  });
 }
 
 /* ─────────── 선생님: 발표/투표 ─────────── */
@@ -664,6 +875,15 @@ function renderTPresent(){
   } else {
     $("tp-votestatus").textContent = `투표 현황: ${total}명 참여 (학생들이 각자 폰에서 고르는 중)`;
   }
+  // 자동 제한시간: 문제가 뜨는 순간 마감 시각을 방에 기록해 모든 기기가 같은 시계를 본다
+  const lim = limitOf();
+  if(lim.on && !revealed && !pres.countdown && !pres.deadline){
+    roomRef().child("present/deadline").set(srvNow() + lim.sec*1000);
+  } else if(!lim.on && pres.deadline){
+    roomRef().child("present/deadline").set(null);
+  }
+  renderQTimer();
+
   $("btn-reveal").style.display = revealed ? "none" : "block";
   $("btn-reveal").disabled = !!pres.countdown;
   $("btn-next-q").textContent = (pres.idx+1>=pres.order.length) ? "🏁 결과 보기" : "다음 →";
@@ -685,16 +905,16 @@ function winnerNames(owner, fakeIndex){
 async function revealAnswer(){
   SFX.init();
   $("btn-reveal").disabled = true;
-  await roomRef().child("present/countdown").set(Date.now());
+  await roomRef().update({ "present/countdown":Date.now(), "present/deadline":null });
 }
 async function nextProblem(){
   const p=S.room.present, ni=p.idx+1;
   if(ni>=p.order.length){ await roomRef().update({ state:"done" }); }
-  else await roomRef().update({ "present/idx":ni, "present/revealed":false, "present/countdown":null });
+  else await roomRef().update({ "present/idx":ni, "present/revealed":false, "present/countdown":null, "present/deadline":null });
 }
 async function prevProblem(){
   const p=S.room.present; if(p.idx<=0) return;
-  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false, "present/countdown":null });
+  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false, "present/countdown":null, "present/deadline":null });
 }
 async function endPresent(){ if(confirm("게임을 종료하고 결과를 볼까요?")) await roomRef().update({ state:"done" }); }
 
@@ -769,8 +989,18 @@ function renderWait(){
 }
 
 /* ─────────── 학생: 문제 작성 ─────────── */
+/* 2단계로 넘어가면 진짜 입력칸을 잠근다.
+   (잠그지 않으면 학생이 위로 올라가 진짜를 고쳐도 제출은 고치기 전 값으로 나간다) */
+function setRealsLocked(lock){
+  document.querySelectorAll(".wr-in").forEach(el=>{ el.readOnly = lock; });
+  $("write-inputs").classList.toggle("locked", lock);
+  $("write-lockmsg").classList.toggle("hidden", !lock);
+  $("write-step2hint").classList.toggle("hidden", lock);
+}
 function resetWriteDOM(){
-  $("write-inputs").innerHTML=""; $("write-fakecard").classList.add("hidden");
+  $("write-inputs").innerHTML=""; $("fake-picker").innerHTML="";
+  $("write-fakecard").classList.add("hidden");
+  setRealsLocked(false);
   S.writeFakeIdx=null; S.writeReals=[];
 }
 function ensureWriteScreen(){
@@ -784,6 +1014,7 @@ function ensureWriteScreen(){
 function renderWriteHeader(){
   $("write-name").textContent = S.name;
   $("write-topic").textContent = S.room.topic || "";
+  renderWriteTimer();
 }
 function readReals(){
   return Array.from(document.querySelectorAll(".wr-in")).map(el=>el.value.trim());
@@ -794,6 +1025,7 @@ function toFakeStep(){
   if(new Set(reals).size<5){ flash("서로 다른 5가지를 적어 주세요!"); return; }
   S.writeReals = reals;
   buildFakePicker();
+  setRealsLocked(true);
   $("write-fakecard").classList.remove("hidden");
   $("write-fakecard").scrollIntoView({behavior:"smooth"});
 }
@@ -825,25 +1057,48 @@ function selectFake(i){
   });
 }
 async function submitProblem(){
+  /* ★ 지금 화면에 적혀 있는 값과 1단계에서 저장해 둔 값이 다르면 절대 그대로 보내지 않는다.
+       (예전엔 낡은 값이 그대로 제출돼서 화면과 다른 문제가 나갔다) */
+  const cur = readReals();
+  if(cur.length!==S.writeReals.length || cur.some((r,k)=>r!==S.writeReals[k])){
+    if(cur.some(r=>!r) || new Set(cur).size<5){
+      setRealsLocked(false);
+      $("write-fakecard").classList.add("hidden");
+      flash("진짜 사실이 바뀌었어요. 5개를 다시 확인해 주세요!");
+      window.scrollTo(0,0);
+      return;
+    }
+    S.writeReals = cur; buildFakePicker(); setRealsLocked(true);
+    flash("진짜 사실이 바뀌었어요! 가짜를 다시 골라 주세요.");
+    return;
+  }
+
   const i = S.writeFakeIdx;
   if(i==null){ flash("가짜로 만들 항목을 골라 주세요!"); return; }
+  if(!(i>=0 && i<S.writeReals.length)){ flash("다시 골라 주세요!"); buildFakePicker(); return; }
   const fkInput = document.querySelector(`.fk-in[data-i="${i}"]`);
   const fake = (fkInput?fkInput.value.trim():"");
   if(!fake){ flash("가짜 문구를 적어 주세요!"); return; }
   if(fake===S.writeReals[i]){ flash("가짜가 진짜와 똑같아요! 살짝 바꿔 주세요."); return; }
+
   const items = S.writeReals.slice();
   const realValue = items[i];
   items[i] = fake;
   $("btn-submit-problem").disabled=true;
-  await roomRef().child("problems/"+S.pid).set({ items, fakeIndex:i, realValue, submittedAt: firebase.database.ServerValue.TIMESTAMP });
-  await roomRef().child("players/"+S.pid).update({ submitted:true });
-  $("btn-submit-problem").disabled=false;
-  flash("제출 완료! 🎉");
+  try{
+    await roomRef().child("problems/"+S.pid).set({ items, fakeIndex:i, realValue, submittedAt: firebase.database.ServerValue.TIMESTAMP });
+    await roomRef().child("players/"+S.pid).update({ submitted:true });
+    flash("제출 완료! 🎉");
+  }catch(e){
+    flash("제출에 실패했어요. 다시 눌러 주세요!");
+  }finally{
+    $("btn-submit-problem").disabled=false;
+  }
 }
 async function editProblem(){
   await roomRef().child("players/"+S.pid).update({ submitted:false });
   await roomRef().child("problems/"+S.pid).remove();
-  $("write-inputs").innerHTML=""; $("write-fakecard").classList.add("hidden");
+  resetWriteDOM();   // 입력칸·가짜선택·저장된 값까지 전부 초기화 (예전엔 옛 상태가 남았다)
 }
 
 /* ─────────── 결과 ─────────── */
@@ -904,8 +1159,10 @@ function renderDone(){
     const v=(room.votes||{})[owner]||{}, total=Object.keys(v).length;
     const correct=Object.values(v).filter(c=>c===prob.fakeIndex).length;
     const pct = total?Math.round(correct/total*100):0;
+    // 가짜 문장과 진짜 문장을 분명히 나눠서 보여준다 (예전엔 가짜 번호 옆에 진짜 문장이 붙어 헷갈렸다)
     return `<tr><td><b>${esc(players[owner]?players[owner].name:"?")}</b></td>
-      <td><span class="badge-fake">${NUM[prob.fakeIndex]}번</span> ${esc(prob.realValue||"")}</td>
+      <td><div><span class="badge-fake">${NUM[prob.fakeIndex]}번 가짜</span> ${esc(prob.items?prob.items[prob.fakeIndex]:"")}</div>
+        <div class="muted" style="margin-top:3px">진짜는 “${esc(prob.realValue||"")}”</div></td>
       <td>${total?`${correct}/${total} (${pct}%)`:"-"}</td></tr>`;
   }).join("");
   $("done-rows").innerHTML = rows || `<tr><td colspan="3" class="muted">문제가 없어요</td></tr>`;
@@ -918,7 +1175,9 @@ function renderDone(){
 }
 async function playAgain(){
   const players=S.room.players||{};
-  const updates={ state:"writing", present:null, votes:null, problems:null };
+  const t=wtOf();
+  const updates={ state:"writing", present:null, votes:null, problems:null,
+    writeTimer:{ dur:t.dur, remain:t.dur, running:false, endsAt:null } };   // 작성 타이머도 새로 채워 둔다
   Object.keys(players).forEach(pid=>{ updates[`players/${pid}/submitted`]=false; });
   S.qrDone=false;
   await roomRef().update(updates);
@@ -959,6 +1218,20 @@ const SFX = {
     if(!this.canSound() || !this.init()) return;
     const t=this.ctx.currentTime;
     this.tone(440 + (3-n)*110, t, 0.18, "square", 0.16);
+  },
+  /* 제한시간 마지막 5초 초읽기 */
+  beep(){
+    if(!this.canSound() || !this.init()) return;
+    this.tone(880, this.ctx.currentTime, 0.09, "square", 0.13);
+  },
+  /* 작성 시간 종료 알람 */
+  alarm(){
+    if(!this.canSound() || !this.init()) return;
+    const t=this.ctx.currentTime;
+    [0,0.28,0.56].forEach(d=>{
+      this.tone(784, t+d, 0.2, "square", 0.18);
+      this.tone(523.25, t+d+0.1, 0.2, "square", 0.16);
+    });
   },
   /* 정답 공개 팡파레 */
   fanfare(){
@@ -1146,7 +1419,7 @@ function hideAnswerModal(){ $("ansmodal").classList.remove("on"); Confetti.stop(
 function syncFx(pres, owner, prob){
   const key = pres.idx+"|"+owner;
   if(S.fxKey !== key){           // 다른 문제로 넘어가면 전부 초기화
-    S.fxKey=key; S.cdSeen=null; S.revealSeen=false;
+    S.fxKey=key; S.cdSeen=null; S.revealSeen=false; S.lastBeep=null;
     stopCountdown(); hideAnswerModal();
   }
   const cd = pres.countdown || 0;
@@ -1190,7 +1463,12 @@ function wire(){
   $("in-name").addEventListener("keydown",e=>{ if(e.key==="Enter") $("btn-join").click(); });
 
   $("btn-to-fake").onclick = toFakeStep;
-  $("btn-back-write").onclick = ()=>{ $("write-fakecard").classList.add("hidden"); window.scrollTo(0,0); };
+  $("btn-back-write").onclick = ()=>{
+    $("write-fakecard").classList.add("hidden");
+    setRealsLocked(false);      // 다시 고칠 수 있게 잠금 해제
+    S.writeFakeIdx = null;
+    window.scrollTo(0,0);
+  };
   $("btn-submit-problem").onclick = submitProblem;
   $("btn-edit-problem").onclick = editProblem;
 
@@ -1202,6 +1480,14 @@ function wire(){
   $("btn-end-present").onclick = endPresent;
   $("btn-again").onclick = playAgain;
   $("btn-home2").onclick = goHome;
+
+  $("wt-start").onclick = wtToggle;
+  $("wt-reset").onclick = wtReset;
+  $("wt-plus").onclick  = ()=>wtAdjust(60);
+  $("wt-minus").onclick = ()=>wtAdjust(-60);
+  $("al-plus").onclick  = ()=>alAdjust(5);
+  $("al-minus").onclick = ()=>alAdjust(-5);
+  $("al-toggle").onclick = alToggle;
 
   $("btn-toggle-joinqr").onclick = ()=>{
     const c=$("tp-joincard"), hidden=c.classList.toggle("hidden");
@@ -1218,6 +1504,8 @@ function boot(){
   wire();
   firebase.initializeApp(FIREBASE_CONFIG);
   db = firebase.database();
+  db.ref(".info/serverTimeOffset").on("value", s=>{ SRV_OFFSET = s.val() || 0; });
+  setInterval(timerTick, 250);
   const params=new URLSearchParams(location.search);
   const qrRoom=(params.get("room")||"").toUpperCase();
   const saved=JSON.parse(sessionStorage.getItem("jjg-session")||"null");
