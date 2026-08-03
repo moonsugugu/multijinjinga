@@ -217,6 +217,12 @@
     padding:10px 12px; margin-top:10px; font-size:13px; color:var(--sub); line-height:1.6;
   }
 
+  /* 로그인 안내 */
+  .authnote{
+    background:#fffbeb; border:1.5px solid #fcd34d; border-radius:10px;
+    padding:9px 12px; margin-top:8px; font-size:13px; color:#92400e; line-height:1.65;
+  }
+
   /* ── 타이머 ── */
   .bigtime{
     font-size:52px; font-weight:900; text-align:center; letter-spacing:2px;
@@ -734,7 +740,9 @@ function renderTeacherAuth(){
   const u = firebase.auth().currentUser, on = isTeacher();
   $("teacher-auth").innerHTML = on
     ? `✅ <b>${esc(u.displayName || u.email || "선생님")}</b> 님으로 로그인됨`
-    : `방을 만들려면 <b>구글 로그인</b>이 한 번 필요해요.<br>학생은 로그인 없이 QR로 들어옵니다.`;
+    : `방을 만들려면 <b>구글 로그인</b>이 한 번 필요해요.<br>학생은 로그인 없이 QR로 들어옵니다.
+       <div class="authnote">⚠️ <b>개인 구글 계정</b>(gmail.com)으로 로그인해 주세요.<br>
+       교육청·학교 계정은 관리자 설정 때문에 로그인이 막힐 수 있어요.</div>`;
   $("btn-create").textContent = on ? "문제 방 만들기" : "🔐 구글로 로그인하고 방 만들기";
   $("btn-signout").style.display = on ? "block" : "none";
 }
