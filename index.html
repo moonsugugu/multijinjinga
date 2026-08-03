@@ -1054,6 +1054,7 @@ function renderSPresent(){
       (wins.length? `<br><span class="muted">🏅 ${wins.map(n=>esc(n)).join(", ")}</span>`:"");
   } else rb.classList.add("hidden");
 
+  renderQTimer();   // 0.25초 타이머를 기다리지 않고 화면 그릴 때 바로 표시
   syncFx(pres, owner, prob);
 }
 async function castVote(i){
