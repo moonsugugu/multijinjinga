@@ -287,7 +287,9 @@
     <p class="tagline">진짜 진짜 <b>가짜</b>! 5개 중 딱 하나뿐인 가짜를 찾아라</p>
     <div class="card">
       <h2>👩‍🏫 선생님</h2>
+      <div class="muted" id="teacher-auth" style="margin:-4px 0 12px; line-height:1.6"></div>
       <button class="btn big" id="btn-create">문제 방 만들기</button>
+      <button class="btn secondary" id="btn-signout" style="margin-top:8px; display:none">로그아웃</button>
     </div>
     <div class="card">
       <h2>🙋 학생</h2>
@@ -718,6 +720,48 @@ function timerTick(){
 const ROOM_TTL = 24*60*60*1000;   // 24시간
 const MAX_PLAYERS = 50;           // 방 하나에 들어올 수 있는 학생 수
 const MAX_ROOMS_PER_DAY = 10;     // 한 사람이 하루에 만들 수 있는 방 수
+
+/* ════════════════════════════════════════════════════════════
+   🔐 로그인
+   선생님만 구글 로그인(방을 만들려면 필수). 학생은 계속 익명이라
+   아이들은 아무것도 입력하지 않는다.
+   ════════════════════════════════════════════════════════════ */
+function isTeacher(){
+  const u = firebase.auth().currentUser;
+  return !!(u && !u.isAnonymous);
+}
+function renderTeacherAuth(){
+  const u = firebase.auth().currentUser, on = isTeacher();
+  $("teacher-auth").innerHTML = on
+    ? `✅ <b>${esc(u.displayName || u.email || "선생님")}</b> 님으로 로그인됨`
+    : `방을 만들려면 <b>구글 로그인</b>이 한 번 필요해요.<br>학생은 로그인 없이 QR로 들어옵니다.`;
+  $("btn-create").textContent = on ? "문제 방 만들기" : "🔐 구글로 로그인하고 방 만들기";
+  $("btn-signout").style.display = on ? "block" : "none";
+}
+async function signInTeacher(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try{
+    await firebase.auth().signInWithPopup(provider);
+    return true;
+  }catch(e){
+    if(e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request"){
+      return false;                      // 사용자가 그냥 닫은 경우 — 조용히 넘어간다
+    }
+    if(e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment"){
+      flash("팝업이 막혀서 로그인 화면으로 이동해요...");
+      await firebase.auth().signInWithRedirect(provider);   // 카톡 등 앱 안에서 열었을 때 대비
+      return false;
+    }
+    flash("로그인에 실패했어요. 다시 눌러 주세요!");
+    return false;
+  }
+}
+async function signOutTeacher(){
+  await firebase.auth().signOut();
+  await firebase.auth().signInAnonymously().catch(()=>{});
+  renderTeacherAuth();
+  flash("로그아웃했어요.");
+}
 
 /* ─── 하루 방 만들기 횟수 ───
    quota/<uid> = {day, count} 에 기록하고, 규칙이 "하루 10회·1씩만 증가"를 검사한다.
@@ -1579,11 +1623,19 @@ function syncFx(pres, owner, prob){
 /* ─────────── 이벤트 연결 ─────────── */
 function wire(){
   $("btn-create").onclick = async ()=>{
+    if(!isTeacher()){                       // 로그인 안 됐으면 먼저 로그인
+      $("btn-create").disabled = true;
+      const ok = await signInTeacher();
+      $("btn-create").disabled = false;
+      renderTeacherAuth();
+      if(!ok) return;
+    }
     showScreen("scr-create");
     $("create-quota").textContent = "";
     const left = await quotaLeft();
     $("create-quota").innerHTML = `오늘 만들 수 있는 방: <b>${left}개</b> 남음 (하루 ${MAX_ROOMS_PER_DAY}개) · 한 방에 학생 ${MAX_PLAYERS}명까지`;
   };
+  $("btn-signout").onclick = signOutTeacher;
   $("btn-create-back").onclick = ()=>showScreen("scr-home");
   $("btn-do-create").onclick = doCreateRoom;
   $("in-topic").addEventListener("keydown",e=>{ if(e.key==="Enter") doCreateRoom(); });
@@ -1649,13 +1701,19 @@ async function boot(){
   db.ref(".info/serverTimeOffset").on("value", s=>{ SRV_OFFSET = s.val() || 0; });
   setInterval(timerTick, 250);
 
-  /* 익명 로그인 — 아이들이 뭘 입력하는 게 아니라 앱이 이름 없는 신분증을 자동으로 받는다.
-     이게 있어야 "방을 만든 선생님"만 방을 지우거나 발표를 넘길 수 있게 규칙으로 막을 수 있다. */
-  try{
-    await firebase.auth().signInAnonymously();
-  }catch(e){
-    flash("접속에 문제가 있어요. 새로고침해 주세요!");
+  /* 로그인 준비.
+     선생님이 예전에 구글로 로그인했다면 그 계정이 그대로 복구된다.
+     아무도 로그인돼 있지 않을 때만(=학생) 익명으로 들어간다. */
+  await firebase.auth().getRedirectResult().catch(()=>{});      // 팝업 대신 이동 방식으로 로그인한 경우
+  await new Promise(res=>{                                       // 저장된 로그인 상태가 복구될 때까지 대기
+    const un = firebase.auth().onAuthStateChanged(()=>{ un(); res(); });
+  });
+  if(!firebase.auth().currentUser){
+    try{ await firebase.auth().signInAnonymously(); }
+    catch(e){ flash("접속에 문제가 있어요. 새로고침해 주세요!"); }
   }
+  firebase.auth().onAuthStateChanged(()=>{ renderTeacherAuth(); });
+  renderTeacherAuth();
 
   const params=new URLSearchParams(location.search);
   const qrRoom=(params.get("room")||"").toUpperCase();
