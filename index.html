@@ -542,9 +542,10 @@
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<!-- Firebase 대신 문수네집 홈서버의 PocketBase 를 사용합니다.
+     pb-adapter.js 가 Firebase RTDB 문법을 그대로 받아 PocketBase 로 번역하므로
+     아래 앱 코드는 예전 그대로입니다. -->
+<script src="./pb-adapter.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════
