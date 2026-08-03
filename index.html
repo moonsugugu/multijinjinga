@@ -704,6 +704,29 @@ function timerTick(){
   }
 }
 
+/* ════════════════════════════════════════════════════════════
+   🧹 오래된 방 자동 삭제
+   무료 요금제라 서버(Cloud Functions)를 못 쓰므로, 선생님이 새 방을 만들 때
+   슬쩍 청소한다. 방 목록은 규칙상 읽을 수 없어서 "코드→만든시각"만 담은
+   작은 목록을 따로 둔다.
+   ※ 방 코드 알파벳에 I 가 없어서 INDEX 라는 코드는 절대 생성되지 않는다.
+   ※ qr-bingo 방은 JJG_ 로 시작하지 않으므로 애초에 목록에 없다 = 안전.
+   ════════════════════════════════════════════════════════════ */
+const ROOM_TTL = 24*60*60*1000;   // 24시간
+function indexRef(){ return db.ref("rooms/JJG_INDEX"); }
+async function cleanupOldRooms(){
+  try{
+    const idx = (await indexRef().get()).val() || {};
+    const cutoff = srvNow() - ROOM_TTL;
+    const dead = Object.entries(idx).filter(([code,at])=> typeof at==="number" && at < cutoff);
+    if(!dead.length) return;
+    await Promise.all(dead.flatMap(([code])=>[
+      db.ref("rooms/JJG_"+code).remove(),
+      indexRef().child(code).remove()
+    ]));
+  }catch(e){ /* 청소는 실패해도 수업에 지장이 없으니 조용히 넘어간다 */ }
+}
+
 /* ─────────── 방 만들기 / 입장 ─────────── */
 async function doCreateRoom(){
   const topic = $("in-topic").value.trim();
@@ -715,18 +738,24 @@ async function doCreateRoom(){
     writeTimer:{ dur:DEF_WRITE_SEC, remain:DEF_WRITE_SEC, running:false, endsAt:null },
     settings:{ autoOn:true, limitSec:DEF_LIMIT_SEC },
   });
+  await indexRef().child(S.code).set(firebase.database.ServerValue.TIMESTAMP);
   saveSession(); attachRoom();
+  cleanupOldRooms();          // 새 방을 만든 김에 오래된 방 정리 (기다리지 않음)
 }
 
 async function joinRoom(code, name){
-  const snap = await refFor(code).get();
-  if(!snap.exists()){ flash("방을 찾을 수 없어요. 코드를 확인해 주세요!"); return false; }
-  const room = snap.val() || {};
+  // 방 전체가 아니라 확인에 필요한 두 가지만 읽는다
+  const [stSnap, plSnap] = await Promise.all([
+    refFor(code).child("state").get(),
+    refFor(code).child("players").get()
+  ]);
+  if(!stSnap.exists()){ flash("방을 찾을 수 없어요. 코드를 확인해 주세요!"); return false; }
+  const room = { state: stSnap.val() };
   S.role="student"; S.code=code; S.name=name;
 
   /* 이미 같은 이름이 있으면 = 중간에 튕겼다 다시 들어온 학생.
      새 자리를 만들지 않고 원래 자리(문제·투표·점수)를 그대로 이어받는다. */
-  const players = room.players || {};
+  const players = plSnap.val() || {};
   const mine = Object.entries(players).find(([,p]) => String(p.name||"").trim() === name);
   if(mine){
     S.pid = mine[0];
@@ -742,15 +771,68 @@ async function joinRoom(code, name){
   return true;
 }
 
-/* ─────────── 실시간 동기화 ─────────── */
-function attachRoom(){
-  roomRef().on("value", snap=>{
-    const room = snap.val();
-    if(!room){ if(S.role==="student") flash("선생님이 방을 닫았어요."); goHome(); return; }
-    S.room = room; render();
-  });
+/* ════════════════════════════════════════════════════════════
+   실시간 동기화
+   방 전체를 통째로 구독하면 누가 투표 한 번 할 때마다 21명분 문제가
+   전원에게 다시 내려간다. 그래서 필요한 가지만 따로 구독한다.
+   S.room 의 모양은 예전과 똑같이 유지하므로 화면 그리는 코드는 그대로 쓴다.
+   ════════════════════════════════════════════════════════════ */
+let SUBS = [];      // 방 전체에 걸어 둔 구독
+let CURSUBS = [];   // 지금 발표 중인 문제에만 걸어 둔 구독
+function subscribe(list, path, cb){
+  const ref = roomRef().child(path);
+  const h = ref.on("value", s=>cb(s.val()));
+  list.push({ref, h});
 }
-function detachRoom(){ if(S.code && db) refFor(S.code).off(); }
+function unsubscribeAll(list){ list.forEach(({ref,h})=>ref.off("value",h)); list.length = 0; }
+
+function attachRoom(){
+  detachRoom();
+  S.room = {};
+  // 작은 것들만 상시 구독 (전부 합쳐도 몇 KB)
+  subscribe(SUBS, "state", v=>{
+    if(v==null){ if(S.role==="student") flash("선생님이 방을 닫았어요."); goHome(); return; }
+    S.room.state=v; render();
+  });
+  subscribe(SUBS, "topic",      v=>{ S.room.topic=v;      render(); });
+  subscribe(SUBS, "players",    v=>{ S.room.players=v||{};render(); });
+  subscribe(SUBS, "settings",   v=>{ S.room.settings=v||{};render(); });
+  subscribe(SUBS, "writeTimer", v=>{ S.room.writeTimer=v||{}; render(); });
+  subscribe(SUBS, "present",    v=>{ S.room.present=v; syncCurrentSubs(); render(); });
+}
+/* 발표 중인 문제가 바뀔 때마다 그 문제와 그 문제의 투표만 새로 구독 */
+function syncCurrentSubs(){
+  const owner = currentOwner();
+  if(owner === S.curOwner) return;
+  unsubscribeAll(CURSUBS);
+  S.curOwner = owner;
+  if(!owner){ S.room.problems={}; S.room.votes={}; return; }   // 발표가 끝나면 들고 있던 문제도 비운다
+  S.room.problems = S.room.problems || {};
+  S.room.votes    = S.room.votes    || {};
+  subscribe(CURSUBS, "problems/"+owner, v=>{ S.room.problems[owner]=v;      render(); });
+  subscribe(CURSUBS, "votes/"+owner,    v=>{ S.room.votes[owner]=v||{};     render(); });
+}
+/* 결과 화면은 전체 문제·전체 투표가 필요하니 그때 딱 한 번만 받아 온다 */
+async function loadAllForDone(){
+  if(S.doneLoading || S.doneLoaded) return;
+  S.doneLoading = true;
+  try{
+    const [ps, vs] = await Promise.all([
+      roomRef().child("problems").get(),
+      roomRef().child("votes").get()
+    ]);
+    S.room.problems = ps.val() || {};
+    S.room.votes    = vs.val() || {};
+    S.doneLoaded = true;
+  }finally{
+    S.doneLoading = false;
+  }
+  render();
+}
+function detachRoom(){
+  unsubscribeAll(SUBS); unsubscribeAll(CURSUBS);
+  S.curOwner = null; S.doneLoaded = false; S.doneLoading = false;
+}
 function goHome(){
   detachRoom(); clearSession();
   BGM.stop(); stopCountdown(); hideAnswerModal(); S.fxKey=null; S.doneFx=false;
@@ -761,11 +843,13 @@ function goHome(){
 
 /* ─────────── 상태 기반 라우팅 ─────────── */
 function render(){
-  const room = S.room; if(!room) return;
-  const state = room.state || "writing";
+  const room = S.room;
+  if(!room || room.state==null) return;   // 첫 값이 도착하기 전에는 그리지 않는다
+  const state = room.state;
   const prev = S.prevState; S.prevState = state;
   if(state!=="presenting"){ BGM.stop(); stopCountdown(); hideAnswerModal(); S.fxKey=null; }
-  if(state!=="done") S.doneFx=false;
+  if(state!=="done"){ S.doneFx=false; S.doneLoaded=false; }
+  else if(!S.doneLoaded){ loadAllForDone(); return; }   // 결과에 필요한 전체 데이터를 받은 뒤 그린다
   if(S.role==="teacher"){
     if(state==="writing")         { showScreen("scr-lobby");     renderLobby(); }
     else if(state==="presenting") { showScreen("scr-tpresent");  renderTPresent(); }
@@ -816,7 +900,7 @@ function renderLobby(){
 }
 
 async function startPresenting(){
-  const probs = S.room.problems || {};
+  const probs = (await roomRef().child("problems").get()).val() || {};  // 순서를 짤 때만 전체를 읽는다
   const order = Object.keys(probs).sort((a,b)=>(probs[a].submittedAt||0)-(probs[b].submittedAt||0));
   if(!order.length){ flash("아직 제출한 학생이 없어요!"); return; }
   const players = S.room.players || {};
@@ -844,7 +928,7 @@ function renderTPresent(){
   $("tp-progress").textContent = (pres.idx+1) + " / " + pres.order.length;
   $("tp-who").textContent = "🙋 " + (players[owner]? players[owner].name : "?") + " 님의 문제";
   $("tp-topic").textContent = room.topic ? "주제: "+room.topic : "";
-  if(!prob){ $("tp-opts").innerHTML = '<div class="muted center">문제를 불러올 수 없어요</div>'; return; }
+  if(!prob){ $("tp-opts").innerHTML = '<div class="muted center">문제를 불러오는 중이에요…</div>'; return; }
 
   const votes = votesFor(owner);
   const counts = [0,0,0,0,0];
@@ -926,7 +1010,7 @@ function renderSPresent(){
   $("sp-progress").textContent = (pres.idx+1)+" / "+pres.order.length;
   $("sp-who").textContent = "🙋 "+(players[owner]?players[owner].name:"?")+" 님의 문제";
   $("sp-topic").textContent = room.topic ? "주제: "+room.topic : "";
-  if(!prob){ $("sp-opts").innerHTML=""; return; }
+  if(!prob){ $("sp-opts").innerHTML='<div class="muted center">문제를 불러오는 중이에요…</div>'; return; }
   const revealed = !!pres.revealed;
   const isOwner = owner===S.pid;
   const myVote = ((room.votes||{})[owner]||{})[S.pid];
@@ -1184,7 +1268,10 @@ async function playAgain(){
 }
 async function closeRoom(){
   if(!confirm("방을 닫을까요? 학생들도 모두 나가게 돼요.")) return;
-  await roomRef().remove(); goHome();
+  const code = S.code;
+  await roomRef().remove();
+  indexRef().child(code).remove();
+  goHome();
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1511,7 +1598,7 @@ function boot(){
   const saved=JSON.parse(sessionStorage.getItem("jjg-session")||"null");
   if(saved && saved.code){
     Object.assign(S, saved);
-    refFor(S.code).get().then(snap=>{
+    refFor(S.code).child("state").get().then(snap=>{   // 존재 확인만 하면 되니 방 전체를 읽지 않는다
       if(snap.exists()){ if(S.role==="teacher") S.qrDone=false; attachRoom(); }
       else { clearSession(); routeFresh(qrRoom); }
     });
