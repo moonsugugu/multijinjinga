@@ -533,6 +533,7 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
@@ -732,8 +733,10 @@ async function doCreateRoom(){
   const topic = $("in-topic").value.trim();
   if(!topic){ flash("주제를 입력해 주세요!"); $("in-topic").focus(); return; }
   S.role="teacher"; S.code=genCode(); S.qrDone=false;
+  const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
   await roomRef().set({
     createdAt: firebase.database.ServerValue.TIMESTAMP,
+    ownerUid: uid,          // 이 방의 주인(선생님). 규칙이 이걸로 권한을 판단한다.
     state:"writing", topic,
     writeTimer:{ dur:DEF_WRITE_SEC, remain:DEF_WRITE_SEC, running:false, endsAt:null },
     settings:{ autoOn:true, limitSec:DEF_LIMIT_SEC },
@@ -1588,12 +1591,21 @@ function wire(){
 }
 
 /* ─────────── 시작 ─────────── */
-function boot(){
+async function boot(){
   wire();
   firebase.initializeApp(FIREBASE_CONFIG);
   db = firebase.database();
   db.ref(".info/serverTimeOffset").on("value", s=>{ SRV_OFFSET = s.val() || 0; });
   setInterval(timerTick, 250);
+
+  /* 익명 로그인 — 아이들이 뭘 입력하는 게 아니라 앱이 이름 없는 신분증을 자동으로 받는다.
+     이게 있어야 "방을 만든 선생님"만 방을 지우거나 발표를 넘길 수 있게 규칙으로 막을 수 있다. */
+  try{
+    await firebase.auth().signInAnonymously();
+  }catch(e){
+    flash("접속에 문제가 있어요. 새로고침해 주세요!");
+  }
+
   const params=new URLSearchParams(location.search);
   const qrRoom=(params.get("room")||"").toUpperCase();
   const saved=JSON.parse(sessionStorage.getItem("jjg-session")||"null");

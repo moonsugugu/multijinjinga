@@ -1,0 +1,39 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".read": true,
+
+        // JJG_ 로 시작하지 않는 방(qr-bingo 등)은 예전과 완전히 동일하게 누구나 쓰기 가능.
+        // 진진가 방은 (1) 방을 만든 선생님 (2) 방을 새로 만드는 경우
+        // (3) 24시간 지난 방을 지우는 경우에만 방 단위 쓰기를 허용한다.
+        ".write": "!$room.beginsWith('JJG_') || ($room === 'JJG_INDEX' && auth !== null) || (auth !== null && (!data.exists() || data.child('ownerUid').val() === auth.uid || (!newData.exists() && data.child('createdAt').val() < now - 86400000)))",
+
+        // 아래는 학생에게 꼭 필요한 곳만 따로 열어 주는 규칙.
+        // 규칙은 권한을 더하기만 하고 위에서 준 권한을 빼앗지 않으므로 qr-bingo에는 영향이 없다.
+        "players": {
+          "$pid": { ".write": "auth !== null" }
+        },
+        "problems": {
+          "$pid": {
+            // 문제 제출·수정은 작성 단계에서만. 발표가 시작되면 아무도 못 바꾼다.
+            ".write": "auth !== null && data.parent().parent().child('state').val() === 'writing'"
+          }
+        },
+        "votes": {
+          "$owner": {
+            "$pid": {
+              ".write": "auth !== null",
+              // 진진가 투표는 0~4 숫자만. 다른 앱 데이터에는 적용되지 않도록 조건을 건다.
+              ".validate": "!$room.beginsWith('JJG_') || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 4)"
+            }
+          }
+        }
+      }
+    },
+    "auction": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
