@@ -752,7 +752,12 @@ async function signInTeacher(){
       await firebase.auth().signInWithRedirect(provider);   // 카톡 등 앱 안에서 열었을 때 대비
       return false;
     }
-    flash("로그인에 실패했어요. 다시 눌러 주세요!");
+    if(e.code === "auth/unauthorized-domain"){
+      // Firebase 콘솔 > Authentication > 설정 > 승인된 도메인 에 이 주소가 없을 때
+      flash("이 주소(" + location.hostname + ")가 로그인 허용 목록에 없어요.");
+      return false;
+    }
+    flash("로그인 실패: " + (e.code || e.message));          // 원인을 화면에 그대로 보여 준다
     return false;
   }
 }
