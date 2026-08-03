@@ -313,6 +313,7 @@
       <button class="btn secondary" style="width:auto; padding:8px 14px; font-size:13px" id="btn-create-back">← 뒤로</button></div>
     <div class="card">
       <h2>📝 주제 정하기</h2>
+      <div class="muted" id="create-quota" style="margin:-6px 0 10px"></div>
       <label class="f">이번 게임의 주제 / 제목</label>
       <input type="text" id="in-topic" placeholder="예) 나를 소개합니다 / 조선시대 인물 / 우리 반 상식" maxlength="40">
       <div class="muted" style="margin-top:6px">학생들은 이 주제에 맞는 <b>진짜 사실 5개</b>를 적게 돼요.</div>
@@ -342,7 +343,8 @@
       <div class="muted" id="lobby-url" style="word-break:break-all"></div>
     </div>
     <div class="card">
-      <h2>✍️ 작성 현황 — <span id="lobby-progress" style="color:var(--primary)">0 / 0</span> 완료</h2>
+      <h2>✍️ 작성 현황 — <span id="lobby-progress" style="color:var(--primary)">0 / 0</span> 완료
+        <span class="muted" id="lobby-cap" style="font-size:13px; font-weight:400; margin-left:6px"></span></h2>
       <div class="chips" id="lobby-players"><span class="muted">아직 입장한 학생이 없어요...</span></div>
     </div>
     <div class="card">
@@ -714,6 +716,35 @@ function timerTick(){
    ※ qr-bingo 방은 JJG_ 로 시작하지 않으므로 애초에 목록에 없다 = 안전.
    ════════════════════════════════════════════════════════════ */
 const ROOM_TTL = 24*60*60*1000;   // 24시간
+const MAX_PLAYERS = 50;           // 방 하나에 들어올 수 있는 학생 수
+const MAX_ROOMS_PER_DAY = 10;     // 한 사람이 하루에 만들 수 있는 방 수
+
+/* ─── 하루 방 만들기 횟수 ───
+   quota/<uid> = {day, count} 에 기록하고, 규칙이 "하루 10회·1씩만 증가"를 검사한다.
+   ※ 브라우저 데이터를 지우면 새 익명 ID가 발급되므로 완벽한 차단은 아니다.
+      실수로 과하게 쓰는 것과 단순한 자동 반복을 막는 용도. */
+function todayNum(){ return Math.floor(srvNow()/86400000); }
+function quotaRef(){
+  const u = firebase.auth().currentUser;
+  return u ? db.ref("quota/"+u.uid) : null;
+}
+async function quotaLeft(){
+  const ref = quotaRef(); if(!ref) return MAX_ROOMS_PER_DAY;
+  try{
+    const cur = (await ref.get()).val() || {};
+    const used = (cur.day === todayNum()) ? (cur.count || 0) : 0;
+    return Math.max(0, MAX_ROOMS_PER_DAY - used);
+  }catch(e){ return MAX_ROOMS_PER_DAY; }
+}
+async function useQuota(){
+  const ref = quotaRef(); if(!ref) return true;      // 로그인이 안 됐으면 막지 않는다
+  const cur = (await ref.get()).val() || {};
+  const day = todayNum();
+  const used = (cur.day === day) ? (cur.count || 0) : 0;
+  if(used >= MAX_ROOMS_PER_DAY) return false;
+  await ref.set({ day, count: used + 1 });
+  return true;
+}
 function indexRef(){ return db.ref("rooms/JJG_INDEX"); }
 async function cleanupOldRooms(){
   try{
@@ -732,6 +763,13 @@ async function cleanupOldRooms(){
 async function doCreateRoom(){
   const topic = $("in-topic").value.trim();
   if(!topic){ flash("주제를 입력해 주세요!"); $("in-topic").focus(); return; }
+  $("btn-do-create").disabled = true;
+  try{
+    if(!(await useQuota())){
+      flash(`오늘은 방을 ${MAX_ROOMS_PER_DAY}개까지 만들 수 있어요. 내일 다시 만들어 주세요!`);
+      return;
+    }
+  }finally{ $("btn-do-create").disabled = false; }
   S.role="teacher"; S.code=genCode(); S.qrDone=false;
   const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
   await roomRef().set({
@@ -760,6 +798,11 @@ async function joinRoom(code, name){
      새 자리를 만들지 않고 원래 자리(문제·투표·점수)를 그대로 이어받는다. */
   const players = plSnap.val() || {};
   const mine = Object.entries(players).find(([,p]) => String(p.name||"").trim() === name);
+  // 새로 들어오는 학생만 인원 제한을 받는다 (재입장은 이미 있는 자리를 이어받으므로 통과)
+  if(!mine && Object.keys(players).length >= MAX_PLAYERS){
+    flash(`이 방은 ${MAX_PLAYERS}명이 꽉 찼어요. 선생님께 말씀해 주세요!`);
+    return false;
+  }
   if(mine){
     S.pid = mine[0];
     await roomRef().child("players/"+S.pid).update({ rejoinedAt: firebase.database.ServerValue.TIMESTAMP });
@@ -893,6 +936,9 @@ function renderLobby(){
   const list = Object.entries(players);
   const done = list.filter(([,p])=>p.submitted).length;
   $("lobby-progress").textContent = done + " / " + list.length;
+  $("lobby-cap").textContent = list.length >= MAX_PLAYERS
+    ? `인원이 꽉 찼어요 (${MAX_PLAYERS}명)`
+    : `입장 ${list.length} / ${MAX_PLAYERS}명`;
   $("lobby-players").innerHTML = list.length
     ? list.map(([,p])=>`<span class="chip ${p.submitted?"done":"writing"}">${esc(p.name)} ${p.submitted?"✅":"✍️"}</span>`).join("")
     : '<span class="muted">아직 입장한 학생이 없어요...</span>';
@@ -1532,7 +1578,12 @@ function syncFx(pres, owner, prob){
 
 /* ─────────── 이벤트 연결 ─────────── */
 function wire(){
-  $("btn-create").onclick = ()=>showScreen("scr-create");
+  $("btn-create").onclick = async ()=>{
+    showScreen("scr-create");
+    $("create-quota").textContent = "";
+    const left = await quotaLeft();
+    $("create-quota").innerHTML = `오늘 만들 수 있는 방: <b>${left}개</b> 남음 (하루 ${MAX_ROOMS_PER_DAY}개) · 한 방에 학생 ${MAX_PLAYERS}명까지`;
+  };
   $("btn-create-back").onclick = ()=>showScreen("scr-home");
   $("btn-do-create").onclick = doCreateRoom;
   $("in-topic").addEventListener("keydown",e=>{ if(e.key==="Enter") doCreateRoom(); });

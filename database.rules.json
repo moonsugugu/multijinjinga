@@ -31,6 +31,15 @@
         }
       }
     },
+    "quota": {
+      "$uid": {
+        // 자기 것만 읽고 쓸 수 있고, 지울 수는 없다(지워서 횟수를 되돌리는 것 방지).
+        ".read": "auth !== null && auth.uid === $uid",
+        ".write": "auth !== null && auth.uid === $uid && newData.exists()",
+        // day 는 반드시 오늘이어야 하고, count 는 1부터 10까지 1씩만 늘어날 수 있다.
+        ".validate": "newData.hasChildren(['day','count']) && newData.child('day').isNumber() && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 10 && newData.child('day').val() * 86400000 <= now && now < (newData.child('day').val() + 1) * 86400000 && (!(data.exists() && data.child('day').val() === newData.child('day').val()) || newData.child('count').val() === data.child('count').val() + 1) && ((data.exists() && data.child('day').val() === newData.child('day').val()) || newData.child('count').val() === 1)"
+      }
+    },
     "auction": {
       ".read": true,
       ".write": true
