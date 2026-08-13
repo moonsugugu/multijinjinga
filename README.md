@@ -7,7 +7,7 @@ QR코드로 접속하고 Firebase Realtime Database로 실시간 동기화되며
 
 > ✅ **배포 완료 — 바로 사용 가능**
 >
-> **👉 https://jinjinga-class.web.app**
+> **👉 https://jinjinga.moonsunezip.com**
 >
 > - Firebase 프로젝트: `gen-lang-client-0204797514` (qr-bingo와 공용)
 > - Realtime Database: 싱가포르 리전, `rooms/JJG_<코드>` 경로만 사용 (qr-bingo와 분리)
