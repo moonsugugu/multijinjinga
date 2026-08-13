@@ -190,14 +190,10 @@
   }
   .home-actions .card h2{font-size:20px;}
   .home-intro{margin:0 0 16px; text-align:center; color:var(--sub); font-size:14px; line-height:1.65;}
-  .home-brand{margin:18px 0 4px; text-align:center;}
+  .home-brand{margin:0 0 20px; text-align:center;}
+  .home-brand h1{font-size:24px; margin:0 0 8px; color:var(--ink);}
   .home-brand .madeby{font-size:13px; color:var(--sub); margin-bottom:10px;}
   .home-brand .madeby .lbtn{margin-left:5px; padding:6px 11px;}
-  .visually-hidden{
-    position:absolute!important; width:1px!important; height:1px!important; padding:0!important;
-    margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important;
-    white-space:nowrap!important; border:0!important;
-  }
   @media (max-width:720px){
     #app{padding:12px;}
     .home-shell{grid-template-columns:1fr; gap:18px;}
@@ -344,7 +340,14 @@
 
   <!-- ══════════ 홈 ══════════ -->
   <section id="scr-home" class="screen">
-    <h1 class="visually-hidden">진짜? 진짜? 가짜? 멀티진진가!</h1>
+    <header class="home-brand">
+      <h1>멀티진진가</h1>
+      <div class="madeby">made by <a class="lbtn" href="https://moonsunezipbrand.vercel.app" target="_blank" rel="noreferrer">🏠 문수네집</a></div>
+      <nav class="clinks" aria-label="문수네집 공식 링크">
+        <a class="lbtn" href="https://www.instagram.com/moonsune.zip/" target="_blank" rel="noreferrer">📷 Instagram</a>
+        <a class="lbtn" href="https://moonsunezip.com" target="_blank" rel="noreferrer">✨ moonsune.zip</a>
+      </nav>
+    </header>
     <div class="home-shell">
       <div class="home-hero">
         <img src="assets/multijinjinga-hero.png" alt="디지털 선글라스를 쓴 탐정 캐릭터와 진짜? 진짜? 가짜? 멀티진진가! 제목">
@@ -366,13 +369,6 @@
             <button class="btn secondary" id="btn-code-join" style="flex:0 0 90px">입장</button>
           </div>
         </div>
-        <footer class="home-brand">
-          <div class="madeby">made by <a class="lbtn" href="https://moonsunezipbrand.vercel.app" target="_blank" rel="noreferrer">🏠 문수네집</a></div>
-          <nav class="clinks" aria-label="문수네집 공식 링크">
-            <a class="lbtn" href="https://www.instagram.com/moonsune.zip/" target="_blank" rel="noreferrer">📷 Instagram</a>
-            <a class="lbtn" href="https://moonsunezip.com" target="_blank" rel="noreferrer">✨ moonsune.zip</a>
-          </nav>
-        </footer>
       </div>
     </div>
   </section>
