@@ -172,6 +172,12 @@
     background:rgba(109,40,217,.13); filter:blur(28px); border-radius:50%; z-index:0;
   }
   .home-hero img{display:block; width:100%; height:auto; position:relative; z-index:1;}
+  .home-title-accent{
+    position:absolute; top:14px; right:14px; z-index:2;
+    display:grid; place-items:center; width:36px; height:36px;
+    border-radius:50%; background:rgba(255,255,255,.88);
+    box-shadow:0 6px 18px rgba(76,29,149,.18); font-size:20px;
+  }
   .home-actions{min-width:0;}
   .home-actions .card{
     padding:22px; border-color:#e4def2; box-shadow:0 10px 28px rgba(30,41,99,.08);
@@ -336,6 +342,7 @@
     <div class="home-shell">
       <div class="home-hero">
         <img src="assets/multijinjinga-hero.png" alt="디지털 선글라스를 쓴 탐정 캐릭터와 진짜? 진짜? 가짜? 멀티진진가! 제목">
+        <span class="home-title-accent" aria-hidden="true">✨</span>
       </div>
       <div class="home-actions">
         <p class="home-intro">5개 중 딱 하나뿐인 가짜를 찾아라!<br>선생님은 방을 만들고, 학생은 코드로 바로 참여해요.</p>
