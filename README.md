@@ -51,3 +51,73 @@ rooms/JJG_<코드>
 
 - `index.html` — 앱 전체 (HTML/CSS/JS + Firebase + QR, 빌드 불필요)
 - `firebase.json`, `.firebaserc` — 배포 설정 (hosting target: `jinjinga` → 사이트 `jinjinga-class`)
+
+<!-- HOMESERVER:START -->
+## 🏠 홈서버 배포 정보 (moonsunezip 노트북 서버)
+
+> **다른 세션·다른 AI 에서 이 앱을 고치기 전에 이 섹션을 먼저 읽으세요.**
+> 서버 관리자가 관리하는 섹션입니다(마지막 갱신 2026-09-27). 앱 설명은 위쪽 본문을 보세요.
+
+### 멀티진진가 — 운영 정보
+
+| 항목 | 값 |
+|---|---|
+| 주소 | https://jinjinga.moonsunezip.com |
+| 서버 포트 | 3001 (PM2 이름 `jinjinga`) |
+| 배포 브랜치 | `main` |
+| 배포 방식 | **빌드 없음** — 저장소 루트의 `index.html` 등을 그대로 정적 서버가 제공 |
+| 서버 위치 | `C:\homeserver\apps\multijinjinga` |
+
+### 이 앱만의 주의점
+
+- 빌드 과정이 없어서 **저장소 루트의 파일이 그대로 공개**됩니다. 비밀값이나 내부 메모 파일을 루트에 두지 마세요.
+- 데이터는 `postgres-adapter.v1.js` → `https://api.moonsunezip.com/v1/jinjinga/…`, 실시간은 `wss://api.moonsunezip.com/v1/realtime?room=방코드` 입니다(쿼리 이름은 `room`, `code` 아님). 실시간은 서버→화면 단방향이고, 보내는 것은 HTTP 로 합니다.
+- **진진가 데이터(`jjg_*` 테이블)는 임시 데이터입니다.** PostgreSQL `UNLOGGED` 테이블이라 빠르지만, 24시간이 지나면 자동 삭제되고 서버가 비정상 종료되면 비워집니다. 선생님이 **오래 남길 기능(문제 저장 등)은 `/v1/documents` 같은 영구 저장소**를 쓰세요.
+- `firebase.json`, `pb-adapter.js` 는 예전 흔적입니다. 새 코드에서 쓰지 마세요.
+- 실측 수용량: 권장 5,000명(200개 반), 동시 WebSocket 10,400개까지 끊김 없음 확인.
+
+### 이 서버는 어떤 곳인가
+
+- **집 노트북 1대**(Lenovo IdeaPad L340 · i5-9300H 4코어 8스레드 · RAM 8GB · Windows 11)가 moonsunezip.com 의 앱 전부를 서비스합니다.
+- 모든 앱은 `127.0.0.1` 에만 열리고, 외부 접속은 **Cloudflare Tunnel** 이 전담합니다(집 IP·포트 비노출, HTTPS 자동).
+- 프로세스는 **PM2** 가 관리하고, **5분마다 감시(watchdog)** 가 죽은 앱을 되살립니다.
+- 데이터 저장은 **PostgreSQL 17 + 공용 API(https://api.moonsunezip.com)** 입니다. Firebase·PocketBase 는 새로 쓰지 않습니다.
+- 여유 자원: RAM 여유 약 0.8GB(넉넉하지 않음), 집 인터넷 업로드 약 170Mbps(Wi-Fi).
+
+### 배포 흐름 — 반드시 이해하고 수정하세요
+
+1. 배포 브랜치에 push 하면 서버가 **3분 안에** 감지합니다.
+2. 서버는 `git reset --hard origin/<브랜치>` 로 코드를 **통째로 덮어쓰고** → `npm ci` → `npm run build` → PM2 재시작 순서로 배포합니다.
+3. 빌드나 헬스체크가 실패하면 **이전 버전으로 자동 롤백**되고 사이트는 이전 상태로 유지됩니다.
+
+따라서:
+- **서버 폴더를 직접 고치지 마세요.** 다음 배포 때 사라지거나, "커밋 안 된 수정"으로 판단돼 배포가 멈춥니다.
+- `package-lock.json` 을 반드시 커밋하세요(`npm ci` 는 lock 파일이 없으면 실패합니다).
+- **게임 서버가 있는 앱은 배포 = 서버 재시작 = 진행 중인 방이 전부 사라짐** 입니다. 수업 시간에는 push 하지 마세요.
+
+### 실시간·게임 코드를 짤 때 지킬 것 (실제로 겪은 문제들)
+
+| 규칙 | 이유 |
+|---|---|
+| 서버는 `HOST`, `PORT` 환경변수를 읽고 기본값을 `127.0.0.1` 로 | 주소를 `0.0.0.0` 으로 코드에 고정하면 서버 설정으로 바꿀 수 없음 |
+| **IP 당 제한을 걸지 마세요** | 학교는 전교생이 **공인 IP 하나**로 나갑니다. 윷놀이의 "IP당 방 6개" 제한이 학교 전체를 막았습니다 |
+| 방 상태 전송 시각·타이머는 **방마다 따로** | 전역 변수 하나로 두면 한 반의 활동이 다른 반 갱신을 밀어냅니다(줄다리기에서 최장 4초 멈춤) |
+| 큰 상태를 자주 보내면 WebSocket 압축(`perMessageDeflate`) | 줄다리기 20개 반 기준 161Mbps → 3Mbps |
+| 끊긴 학생이 **60초 안에 같은 자리로 재접속**할 수 있게 | 교실 와이파이는 자주 끊깁니다. 빈 방도 60초는 유지하세요 |
+| 요청 처리 중 동기 파일 I/O·느린 OS 호출 금지 | Windows 에서 `os.networkInterfaces()` 1회 25ms → 30명 방에서 서버가 멈췄습니다 |
+| 요청마다 목록 전체를 훑는 코드 금지 | 사용자가 늘수록 느려집니다(backend 처리량이 4분의 1이던 원인) |
+| 비밀값(키·비밀번호)은 저장소에 넣지 않기 | 서버의 비밀값은 `C:\homeserver\secrets` 에 따로 있습니다 |
+
+**부하 목표: 한 학교 20개 반 동시 사용(약 600명).** 전국 배포라 한글날처럼 특정 날에 몰립니다.
+
+### 공용 서버 주소
+
+| 용도 | 주소 |
+|---|---|
+| 데이터 API (PostgreSQL) | `https://api.moonsunezip.com` — `/v1/documents/doc`·`/query`·`/commit`, `/health` |
+| 데이터 실시간 알림 (서버→화면 단방향) | `wss://api.moonsunezip.com/v1/realtime?room=방코드` · `/v1/documents/realtime?scope=범위` |
+| 공용 게임 서버 (메모리, 양방향) | `wss://game.moonsunezip.com/v1/game?room=방코드&game=게임이름&name=이름` |
+
+새 주소(서브도메인)나 새 포트가 필요하면 서버 쪽에서 Cloudflare 설정과 PM2 등록을 해야 합니다. 코드만 올려서는 열리지 않습니다.
+
+<!-- HOMESERVER:END -->
