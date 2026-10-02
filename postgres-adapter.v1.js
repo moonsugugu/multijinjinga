@@ -17,30 +17,53 @@
     for (let i = 0; i < 12; i++) s += PUSH_CHARS[Math.floor(Math.random() * 64)];
     return s;
   }
-  async function req(path, options) {
-    const r = await fetch(BASE + path, options);
-    if (r.status === 404) return null;
-    if (!r.ok) throw new Error(`API ${r.status}: ${await r.text().catch(() => '')}`);
-    return r.status === 204 ? null : r.json();
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function req(path, options = {}) {
+    const method = options.method || 'GET';
+    if (method !== 'GET') {
+      const requestId = options.headers?.['X-Request-Id'] || crypto.randomUUID();
+      options = {...options, headers:{...options.headers, 'X-Request-Id':requestId}};
+      if (options.body) options.body = JSON.stringify({...JSON.parse(options.body), requestId});
+    }
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let retryStatus = null;
+      try {
+        const r = await fetch(BASE + path, {...options, signal:controller.signal});
+        if (r.status === 404) return null;
+        if (!r.ok) {
+          if ([409,429,503].includes(r.status) && attempt < 3) retryStatus = r.status;
+          else throw Object.assign(new Error(`API ${r.status}: ${await r.text().catch(() => '')}`), {status:r.status});
+        } else return r.status === 204 ? null : await r.json();
+      } catch (e) {
+        if (e.status || attempt >= 3) throw e;
+      } finally { clearTimeout(timeout); }
+      await sleep(retryStatus === 409 ? 100 + Math.random() * 200 : Math.min(5000, 1000 * 2 ** attempt));
+    }
   }
   const json = (method, value) => ({ method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(value) });
   const enc = encodeURIComponent;
 
   class RoomStore {
     constructor(code) {
-      this.code = code;
-      this.tree = null;
-      this.listeners = new Map();
-      this.ws = null;
-      this.retry = 1000;
-      this.closed = false;
+      this.code = code; this.tree = null; this.listeners = new Map();
+      this.ws = null; this.retry = 1000; this.closed = false;
+      this.loading = null; this.loadedAt = 0; this.loadEvents = null; this.retryTimer = null;
     }
-    async load() {
-      this.tree = await req(`/v1/jinjinga/rooms/${enc(this.code)}`);
-      return this.tree;
+    async load(force = false) {
+      if (this.loading) return this.loading;
+      if (!force && this.tree && (this.listeners.size || Date.now() - this.loadedAt < 1000)) return this.tree;
+      this.loadEvents = [];
+      this.loading = req(`/v1/jinjinga/rooms/${enc(this.code)}`).then(tree => {
+        this.tree = tree; this.loadedAt = Date.now();
+        const events = this.loadEvents; this.loadEvents = null;
+        for (const msg of events || []) this.apply(msg, false);
+        return this.tree;
+      }).finally(() => { this.loading = null; this.loadEvents = null; });
+      return this.loading;
     }
     read(path) {
-      if (!this.tree) return null;
       let cur = this.tree;
       for (const part of String(path || '').split('/').filter(Boolean)) {
         if (cur == null || typeof cur !== 'object') return null;
@@ -55,63 +78,76 @@
       this.connect();
     }
     off(path, callback) {
-      this.listeners.get(path)?.delete(callback);
-      if (![...this.listeners.values()].some(s => s.size)) {
+      const callbacks = this.listeners.get(path);
+      callbacks?.delete(callback);
+      if (!callbacks?.size) this.listeners.delete(path);
+      if (!this.listeners.size) {
         this.closed = true;
-        this.ws?.close();
-        this.ws = null;
+        clearTimeout(this.retryTimer); this.retryTimer = null;
+        const ws = this.ws; this.ws = null; ws?.close();
+        this.tree = null; this.loadedAt = 0;
+        if (!this.loading) stores.delete(this.code);
       }
     }
-    notify(changed) {
+    notify(changed = null) {
       for (const [path, callbacks] of this.listeners) {
-        if (!path || path === changed || changed.startsWith(path + '/') || path.startsWith(changed + '/')) {
+        if (changed == null || !path || path === changed || changed.startsWith(path + '/') || path.startsWith(changed + '/')) {
           const value = this.read(path);
           for (const cb of callbacks) try { cb(value); } catch (e) { console.error(e); }
         }
       }
     }
-    notifyAll() { for (const path of this.listeners.keys()) this.notify(path); }
+    notifyAll() { this.notify(); }
     connect() {
-      if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
-      this.closed = false;
-      const wsBase = BASE.replace(/^http/, 'ws');
-      const ws = this.ws = new WebSocket(`${wsBase}/v1/realtime?room=${enc(this.code)}`);
+      if (!this.listeners.size || this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
+      clearTimeout(this.retryTimer); this.retryTimer = null; this.closed = false;
+      const ws = this.ws = new WebSocket(`${BASE.replace(/^http/, 'ws')}/v1/realtime?room=${enc(this.code)}`);
       ws.onopen = async () => {
-        this.retry = 1000;
-        try { await this.load(); this.notifyAll(); } catch (e) { console.error(e); }
+        if (this.ws !== ws) return;
+        try {
+          await this.load(true);
+          if (this.ws === ws) { this.retry = 1000; this.notifyAll(); }
+        } catch (e) { console.error(e); if (this.ws === ws) ws.close(); }
       };
-      ws.onmessage = (event) => {
+      ws.onmessage = event => {
+        if (this.ws !== ws || this.closed) return;
         let msg; try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'connected') return;
+        if (this.loadEvents) this.loadEvents.push(msg);
         this.apply(msg);
       };
       ws.onclose = () => {
+        if (this.ws !== ws) return;
         this.ws = null;
-        if (!this.closed && [...this.listeners.values()].some(s => s.size)) {
-          setTimeout(() => this.connect(), this.retry);
-          this.retry = Math.min(this.retry * 2, 15_000);
+        if (!this.closed && this.listeners.size) {
+          this.retryTimer = setTimeout(() => { this.retryTimer = null; this.connect(); }, this.retry);
+          this.retry = Math.min(this.retry * 2, 15000);
         }
       };
     }
-    apply(msg) {
-      if (!this.tree && msg.action !== 'delete') return;
+    apply(msg, notify = true) {
       const r = msg.record || {};
-      if (msg.type === 'room') {
-        if (msg.action === 'delete') this.tree = null;
-        else Object.assign(this.tree, r);
-        this.notify('state'); this.notify('topic'); this.notify('present');
-        this.notify('writeTimer'); this.notify('settings');
-      } else if (msg.type === 'player') {
-        if (msg.action === 'delete') delete this.tree.players[r.pid]; else this.tree.players[r.pid] = r;
-        this.notify('players');
-      } else if (msg.type === 'problem') {
-        if (msg.action === 'delete') delete this.tree.problems[r.pid]; else this.tree.problems[r.pid] = r;
-        this.notify('problems/' + r.pid); this.notify('problems');
-      } else if (msg.type === 'vote') {
-        const votes = this.tree.votes[r.ownerPid] ||= {};
-        if (msg.action === 'delete') delete votes[r.voterPid]; else votes[r.voterPid] = r.choice;
-        this.notify('votes/' + r.ownerPid); this.notify('votes');
+      if (msg.type === 'room' && msg.action === 'delete') {
+        this.tree = null; if (notify) this.notifyAll(); return;
       }
+      if (!this.tree) return;
+      let changed;
+      if (msg.type === 'room') {
+        Object.assign(this.tree,r); changed = '';
+      } else if (msg.type === 'player') {
+        const players = this.tree.players ||= {};
+        if (msg.action === 'delete') delete players[r.pid]; else players[r.pid] = r;
+        changed = 'players/' + r.pid;
+      } else if (msg.type === 'problem') {
+        const problems = this.tree.problems ||= {};
+        if (msg.action === 'delete') delete problems[r.pid]; else problems[r.pid] = r;
+        changed = 'problems/' + r.pid;
+      } else if (msg.type === 'vote') {
+        const votes = (this.tree.votes ||= {})[r.ownerPid] ||= {};
+        if (msg.action === 'delete') delete votes[r.voterPid]; else votes[r.voterPid] = r.choice;
+        changed = 'votes/' + r.ownerPid + '/' + r.voterPid;
+      }
+      if (notify && changed !== undefined) this.notify(changed || null);
     }
   }
 
@@ -132,7 +168,7 @@
     if (!st.tree && mode !== 'set') await st.load();
     const parts = String(path || '').split('/').filter(Boolean);
     if (!parts.length) {
-      if (mode === 'remove') { await req(`/v1/jinjinga/rooms/${enc(code)}`, {method:'DELETE'}); stores.delete(code); return; }
+      if (mode === 'remove') { await req(`/v1/jinjinga/rooms/${enc(code)}`, {method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}}); st.tree=null; st.notifyAll(); return; }
       if (mode === 'set') {
         const b = clone(value || {}); for (const k of Object.keys(b)) b[k] = resolveTS(b[k]);
         const room = await req(`/v1/jinjinga/rooms/${enc(code)}`, json('POST', b));
@@ -164,21 +200,21 @@
     }
     if(head==='players' && rest[0]) {
       const pid=rest[0], url=`/v1/jinjinga/rooms/${enc(code)}/players/${enc(pid)}`;
-      if(mode==='remove') return req(url,{method:'DELETE'});
+      if(mode==='remove') return req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}});
       const merged={...(clone(st.read(`players/${pid}`))||{}),...(value||{})};
       for(const k of Object.keys(merged)) merged[k]=resolveTS(merged[k]);
       return req(url,json('PUT',merged));
     }
     if(head==='problems' && rest[0]) {
       const pid=rest[0], url=`/v1/jinjinga/rooms/${enc(code)}/problems/${enc(pid)}`;
-      if(mode==='remove') return req(url,{method:'DELETE'});
+      if(mode==='remove') return req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}});
       const merged={...(clone(st.read(`problems/${pid}`))||{}),...(value||{})};
       for(const k of Object.keys(merged)) merged[k]=resolveTS(merged[k]);
       return req(url,json('PUT',merged));
     }
     if(head==='votes' && rest[0] && rest[1]) {
       const url=`/v1/jinjinga/rooms/${enc(code)}/votes/${enc(rest[0])}/${enc(rest[1])}`;
-      return mode==='remove' ? req(url,{method:'DELETE'}) : req(url,json('PUT',{choice:Number(value)}));
+      return mode==='remove' ? req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}}) : req(url,json('PUT',{choice:Number(value)}));
     }
   }
 
@@ -198,7 +234,7 @@
     on(event,cb){
       if(event!=='value')return cb; if(this.kind==='info'){cb(snap(0));return cb;} if(this.kind!=='room'){cb(snap(null));return cb;}
       const wrapped=v=>cb(snap(v)); cb._wsWrapped=wrapped; const st=storeFor(this.code);
-      if(!st.tree) st.load().then(()=>st.on(this.path,wrapped)).catch(console.error); else st.on(this.path,wrapped);
+      st.on(this.path,wrapped);
       return cb;
     }
     off(event,cb){if(this.kind==='room'&&cb)storeFor(this.code).off(this.path,cb._wsWrapped||cb);}

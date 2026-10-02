@@ -1,7 +1,7 @@
 # 🎭 멀티진진가 (진짜 진짜 가짜) · made by 문수네집
 
 학생들이 **진짜 사실 5가지**를 적으면 그중 하나를 **그럴듯한 가짜**로 바꿔, 반 전체가 "어느 것이 가짜일까?"를 맞히는 실시간 교실 게임입니다.
-QR코드로 접속하고 Firebase Realtime Database로 실시간 동기화되며, `index.html` 파일 하나로 동작합니다.
+QR로 입장하고 `api.moonsunezip.com`의 PostgreSQL REST API와 방 단위 WebSocket으로 동기화합니다. 화면은 `index.html`, 데이터 연결은 `postgres-adapter.v1.js`입니다. 방·학생·문제·투표는 임시 데이터입니다.
 
 > **made by 문수네집** — [🏠 문수네집](https://moonsunezipbrand.vercel.app) · [📷 인스타그램](https://www.instagram.com/moonsune.zip/) · [✨ moonsune.zip](https://moonsune-zip.vercel.app/)
 
@@ -9,9 +9,8 @@ QR코드로 접속하고 Firebase Realtime Database로 실시간 동기화되며
 >
 > **👉 https://jinjinga.moonsunezip.com**
 >
-> - Firebase 프로젝트: `gen-lang-client-0204797514` (qr-bingo와 공용)
-> - Realtime Database: 싱가포르 리전, `rooms/JJG_<코드>` 경로만 사용 (qr-bingo와 분리)
-> - 수정 후 재배포: `cd C:\Users\admin\jinjinga` → `firebase deploy --only hosting:jinjinga`
+> - 데이터 원본: 홈서버 PostgreSQL (`api.moonsunezip.com`)
+> - 배포: GitHub `main` 푸시 후 홈서버 자동 배포. Firebase 데이터 저장은 사용하지 않습니다.
 
 ## 게임 흐름
 
@@ -138,3 +137,12 @@ rooms/JJG_<코드>
 
 **이 저장소 점검(2026-10-02):** 이미 규칙을 지키고 있습니다(api.moonsunezip.com 방 단위 실시간, 바뀐 행만 전달, 재접속 백오프 최대 15초).
 <!-- CODERULE:END -->
+
+
+## 재접속·QR·부하 점검 (2026-10-02)
+
+- 선생님/방장 화면에서 참가 QR을 클릭하면 팝업이 열립니다. 180~720px 슬라이더와 확대·축소 버튼, Esc·바깥 클릭 닫기를 지원하며 작은 화면에는 QR 전체가 보이도록 맞춥니다.
+- 같은 기기·브라우저의 새로고침/다시 입장에서 기존 참가 정보와 방별 자리를 복원합니다. 실제 계정 로그인 기능이 없는 게임은 참가 자리 복귀를 뜻합니다.
+- 같은 방의 병렬 읽기는 한 HTTP 요청으로 합칩니다. 겹치는 구독의 중복 호출과 과거 소켓의 종료 경합을 방지하고 화면 갱신을 80ms 묶습니다.
+- 쓰기 요청은 requestId를 헤더와 본문에 포함합니다. 409/429/503·오프라인·타임아웃은 같은 ID로 최대 세 번 재시도합니다. 개별 학생/문제/투표 행을 분리합니다.
+- node --test postgres-adapter.test.mjs로 25명 동시 저장, ID 재사용, 방 격리, 재접속과 제한된 재시도를 검증했습니다. 테스트 API의 중복 제거를 검증했으며 운영 API 자체의 requestId 중복 제거는 서버 코드 확인이 별도로 필요합니다.

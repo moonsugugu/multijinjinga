@@ -333,6 +333,13 @@
     font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap;
   }
   .bgmbtn.off{opacity:.5;}
+
+.audit-qr-dialog{border:0;border-radius:22px;padding:24px;text-align:center;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;background:#fff;}
+.audit-qr-dialog::backdrop{background:#122333bb;}
+.audit-qr-close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:28px;cursor:pointer;}
+.audit-qr-image img,.audit-qr-image canvas{margin:auto;max-width:100%;width:min(100%,calc(100dvh - 260px));height:auto!important;}
+.audit-qr-size{display:flex;align-items:center;gap:12px;margin:16px 0;}.audit-qr-size label{flex:1;}.audit-qr-size input{display:block;width:100%;}
+#qrcode,#tp-qr{cursor:pointer;border:0;background:transparent;width:100%;}
 </style>
 </head>
 <body>
@@ -403,7 +410,7 @@
     </div>
     <div class="card center">
       <h2>📱 학생들은 QR을 찍어 주세요</h2>
-      <div id="qrcode"></div>
+      <button id="qrcode" type="button" aria-label="학생 입장 QR 크게 보기"></button>
       <div class="muted">또는 코드 입력</div>
       <div class="code-big" id="lobby-code"></div>
       <div class="muted" id="lobby-url" style="word-break:break-all"></div>
@@ -519,8 +526,8 @@
       <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
       <button class="btn good" id="btn-next-q">다음 →</button>
     </div>
-    <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 보기</button>
-    <div class="card hidden" id="tp-joincard" style="margin-top:12px">
+    <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 숨기기</button>
+    <div class="card" id="tp-joincard" style="margin-top:12px">
       <h2 class="center" style="margin-bottom:6px">📲 늦게 들어오거나 튕긴 학생용</h2>
       <p class="muted center" style="margin-top:0">QR을 찍고 <b>원래 쓰던 이름 그대로</b> 넣으면 하던 자리로 돌아와요.</p>
       <div id="tp-qr" class="center"></div>
@@ -644,8 +651,13 @@ function showScreen(id){
 function flash(msg){ const f=$("flash"); f.textContent=msg; f.classList.add("show"); clearTimeout(f._t); f._t=setTimeout(()=>f.classList.remove("show"),1800); }
 function roomRef(){ return db.ref("rooms/JJG_"+S.code); }
 function refFor(code){ return db.ref("rooms/JJG_"+code); }
-function saveSession(){ sessionStorage.setItem("jjg-session", JSON.stringify({role:S.role, code:S.code, pid:S.pid, name:S.name})); }
-function clearSession(){ sessionStorage.removeItem("jjg-session"); }
+function saveSession(){
+  const value=JSON.stringify({role:S.role,code:S.code,pid:S.pid,name:S.name});
+  try{ sessionStorage.setItem("jjg-session",value); localStorage.setItem("jjg-session:"+S.code,value); }catch{ /* 저장 제한 */ }
+}
+function clearSession(){
+  try{ sessionStorage.removeItem("jjg-session"); if(S.code) localStorage.removeItem("jjg-session:"+S.code); }catch{ /* 저장 제한 */ }
+}
 
 /* ════════════════════════════════════════════════════════════
    ⏱️ 타이머 — 기기마다 시계가 다를 수 있으니 서버 시각으로 맞춘다
@@ -939,6 +951,11 @@ async function joinRoom(code, name){
    전원에게 다시 내려간다. 그래서 필요한 가지만 따로 구독한다.
    S.room 의 모양은 예전과 똑같이 유지하므로 화면 그리는 코드는 그대로 쓴다.
    ════════════════════════════════════════════════════════════ */
+let renderTimer = null;
+function scheduleRender(){
+  if(renderTimer!==null) return;
+  renderTimer=setTimeout(()=>{ renderTimer=null; render(); },80);
+}
 let SUBS = [];      // 방 전체에 걸어 둔 구독
 let CURSUBS = [];   // 지금 발표 중인 문제에만 걸어 둔 구독
 function subscribe(list, path, cb){
@@ -954,13 +971,13 @@ function attachRoom(){
   // 작은 것들만 상시 구독 (전부 합쳐도 몇 KB)
   subscribe(SUBS, "state", v=>{
     if(v==null){ if(S.role==="student") flash("선생님이 방을 닫았어요."); goHome(); return; }
-    S.room.state=v; render();
+    S.room.state=v; scheduleRender();
   });
-  subscribe(SUBS, "topic",      v=>{ S.room.topic=v;      render(); });
-  subscribe(SUBS, "players",    v=>{ S.room.players=v||{};render(); });
-  subscribe(SUBS, "settings",   v=>{ S.room.settings=v||{};render(); });
-  subscribe(SUBS, "writeTimer", v=>{ S.room.writeTimer=v||{}; render(); });
-  subscribe(SUBS, "present",    v=>{ S.room.present=v; syncCurrentSubs(); render(); });
+  subscribe(SUBS, "topic",      v=>{ S.room.topic=v;      scheduleRender(); });
+  subscribe(SUBS, "players",    v=>{ S.room.players=v||{};scheduleRender(); });
+  subscribe(SUBS, "settings",   v=>{ S.room.settings=v||{};scheduleRender(); });
+  subscribe(SUBS, "writeTimer", v=>{ S.room.writeTimer=v||{}; scheduleRender(); });
+  subscribe(SUBS, "present",    v=>{ S.room.present=v; syncCurrentSubs(); scheduleRender(); });
 }
 /* 발표 중인 문제가 바뀔 때마다 그 문제와 그 문제의 투표만 새로 구독 */
 function syncCurrentSubs(){
@@ -971,8 +988,8 @@ function syncCurrentSubs(){
   if(!owner){ S.room.problems={}; S.room.votes={}; return; }   // 발표가 끝나면 들고 있던 문제도 비운다
   S.room.problems = S.room.problems || {};
   S.room.votes    = S.room.votes    || {};
-  subscribe(CURSUBS, "problems/"+owner, v=>{ S.room.problems[owner]=v;      render(); });
-  subscribe(CURSUBS, "votes/"+owner,    v=>{ S.room.votes[owner]=v||{};     render(); });
+  subscribe(CURSUBS, "problems/"+owner, v=>{ S.room.problems[owner]=v;      scheduleRender(); });
+  subscribe(CURSUBS, "votes/"+owner,    v=>{ S.room.votes[owner]=v||{};     scheduleRender(); });
 }
 /* 결과 화면은 전체 문제·전체 투표가 필요하니 그때 딱 한 번만 받아 온다 */
 async function loadAllForDone(){
@@ -992,6 +1009,7 @@ async function loadAllForDone(){
   render();
 }
 function detachRoom(){
+  clearTimeout(renderTimer); renderTimer=null;
   unsubscribeAll(SUBS); unsubscribeAll(CURSUBS);
   S.curOwner = null; S.doneLoaded = false; S.doneLoading = false;
 }
@@ -1030,6 +1048,28 @@ function render(){
 /* ─────────── 선생님: 대기실 ─────────── */
 function joinUrl(){ return location.origin + location.pathname + "?room=" + S.code; }
 /* 발표 중에도 쓸 수 있는 "중간 입장" QR (방 코드가 바뀔 때만 다시 그림) */
+
+function openJoinQr(){
+  const focus=document.activeElement, dialog=document.createElement('dialog');
+  dialog.className='audit-qr-dialog'; dialog.setAttribute('aria-label','학생 입장 · 다시 접속 QR');
+  dialog.innerHTML='<button class="audit-qr-close" aria-label="QR 닫기">×</button><h2>학생 입장 · 다시 접속</h2><div class="audit-qr-image"></div><div class="audit-qr-size"><button aria-label="QR 축소">−</button><label>QR 크기 <output></output><input aria-label="QR 크기" type="range" min="180" max="720" step="20"></label><button aria-label="QR 확대">+</button></div><p class="audit-qr-code"></p><p>원래 이름으로 다시 입장하면 문제와 투표를 이어가요.</p>';
+  const range=dialog.querySelector('input'), box=dialog.querySelector('.audit-qr-image');
+  new QRCode(box,{text:joinUrl(),width:720,height:720,correctLevel:QRCode.CorrectLevel.M});
+  let size=360;
+  const resize=n=>{
+    size=Math.max(180,Math.min(720,Number(n))); range.value=size; dialog.querySelector('output').value=size+'px';
+    dialog.style.width=(size+90)+'px';
+    box.style.width='min('+size+'px,calc(100dvh - 260px))'; box.style.margin='auto';
+  };
+  dialog.querySelector('.audit-qr-code').textContent='방 코드 '+S.code;
+  const [minus,plus]=dialog.querySelectorAll('.audit-qr-size button');
+  minus.onclick=()=>resize(size-60); plus.onclick=()=>resize(size+60); range.oninput=()=>resize(range.value);
+  dialog.querySelector('.audit-qr-close').onclick=()=>dialog.close();
+  dialog.onclick=e=>{ if(e.target!==dialog)return; const r=dialog.getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close(); };
+  dialog.onclose=()=>{dialog.remove();if(focus?.isConnected)focus.focus();};
+  resize(size); document.body.append(dialog); dialog.showModal();
+}
+
 function ensureJoinQR(){
   const el = $("tp-qr");
   if(!el || el.dataset.code === S.code) return;
@@ -1188,7 +1228,7 @@ function renderSPresent(){
     let cls="";
     if(revealed) cls = i===prob.fakeIndex?"reveal-fake":"reveal-real";
     else if(myVote===i) cls="picked";
-    const dis = (revealed||isOwner) ? "disabled":"";
+    const dis = (revealed||isOwner||S.votePending) ? "disabled":"";
     const tag = revealed ? (i===prob.fakeIndex?'<span class="tag f">가짜!</span>':'<span class="tag r">진짜</span>') : "";
     let extra="";
     if(revealed){ const pct=total?Math.round(counts[i]/total*100):0;
@@ -1223,10 +1263,12 @@ function renderSPresent(){
   syncFx(pres, owner, prob);
 }
 async function castVote(i){
-  const owner=currentOwner(); if(!owner||owner===S.pid) return;
+  const owner=currentOwner(); if(!owner||owner===S.pid||S.votePending) return;
   if(S.room.present.revealed || S.room.present.countdown) return;
-  await roomRef().child("votes/"+owner+"/"+S.pid).set(i);
-  flash("선택: "+NUM[i]+"번");
+  S.votePending=true; scheduleRender();
+  try { await roomRef().child("votes/"+owner+"/"+S.pid).set(i); flash("선택: "+NUM[i]+"번"); }
+  catch { flash("선택을 저장하지 못했어요. 다시 눌러 주세요."); }
+  finally { S.votePending=false; scheduleRender(); }
 }
 
 /* ─────────── 학생: 대기 ─────────── */
@@ -1307,6 +1349,7 @@ function selectFake(i){
   });
 }
 async function submitProblem(){
+  if($("btn-submit-problem").disabled) return;
   /* ★ 지금 화면에 적혀 있는 값과 1단계에서 저장해 둔 값이 다르면 절대 그대로 보내지 않는다.
        (예전엔 낡은 값이 그대로 제출돼서 화면과 다른 문제가 나갔다) */
   const cur = readReals();
@@ -1694,6 +1737,8 @@ function syncFx(pres, owner, prob){
 
 /* ─────────── 이벤트 연결 ─────────── */
 function wire(){
+  for(const id of ['qrcode','tp-qr']) $(id).onclick=openJoinQr;
+
   $("btn-create").onclick = async ()=>{
     if(!isTeacher()){                       // 로그인 안 됐으면 먼저 로그인
       $("btn-create").disabled = true;
@@ -1722,9 +1767,9 @@ function wire(){
     const name=$("in-name").value.trim();
     if(!name){ flash("이름을 입력해 주세요!"); return; }
     $("btn-join").disabled=true;
-    const ok=await joinRoom(S.pendingCode,name);
-    $("btn-join").disabled=false;
-    if(!ok) showScreen("scr-home");
+    try { const ok=await joinRoom(S.pendingCode,name); if(!ok) showScreen("scr-home"); }
+    catch { flash("접속하지 못했어요. 연결을 확인한 뒤 다시 눌러 주세요."); }
+    finally { $("btn-join").disabled=false; }
   };
   $("in-name").addEventListener("keydown",e=>{ if(e.key==="Enter") $("btn-join").click(); });
 
@@ -1763,6 +1808,21 @@ function wire(){
   $("btn-bgm").onclick = ()=>{ SFX.init(); BGM.toggle(); };
   $("am-close").onclick = hideAnswerModal;
   $("ansmodal").addEventListener("click", e=>{ if(e.target.id==="ansmodal") hideAnswerModal(); });
+  for(const id of ['btn-start-present','btn-close-room','btn-reveal','btn-next-q','btn-prev-q','btn-end-present','btn-again','wt-start','wt-reset','wt-plus','wt-minus','al-plus','al-minus','al-toggle']){
+    const button=$(id), action=button.onclick;
+    button.onclick=async event=>{
+      if(S.teacherBusy) return;
+      S.teacherBusy=true; button.disabled=true; button.setAttribute('aria-busy','true');
+      const label=button.textContent; button.textContent='처리 중…';
+      try { await action(event); }
+      catch { flash('저장하지 못했어요. 연결을 확인한 뒤 다시 눌러 주세요.'); }
+      finally {
+        S.teacherBusy=false; button.disabled=false; button.removeAttribute('aria-busy');
+        if(button.textContent==='처리 중…') button.textContent=label;
+        scheduleRender();
+      }
+    };
+  }
 }
 
 /* ─────────── 시작 ─────────── */
@@ -1789,13 +1849,18 @@ async function boot(){
 
   const params=new URLSearchParams(location.search);
   const qrRoom=(params.get("room")||"").toUpperCase();
-  const saved=JSON.parse(sessionStorage.getItem("jjg-session")||"null");
+  let saved=null;
+  try {
+    saved=JSON.parse((qrRoom ? localStorage.getItem("jjg-session:"+qrRoom) : sessionStorage.getItem("jjg-session"))||"null");
+    if(!saved || !/^[A-Z0-9_-]{4,12}$/.test(saved.code) || !['teacher','student'].includes(saved.role) || (qrRoom&&saved.code!==qrRoom)) saved=null;
+  }catch{ clearSession(); }
+
   if(saved && saved.code){
     Object.assign(S, saved);
     refFor(S.code).child("state").get().then(snap=>{   // 존재 확인만 하면 되니 방 전체를 읽지 않는다
       if(snap.exists()){ if(S.role==="teacher") S.qrDone=false; attachRoom(); }
       else { clearSession(); routeFresh(qrRoom); }
-    });
+    }).catch(()=>{ flash("이전 방을 확인하지 못했어요. 다시 입장해 주세요."); routeFresh(qrRoom); });
   } else routeFresh(qrRoom);
 }
 function routeFresh(qrRoom){
