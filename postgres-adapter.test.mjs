@@ -97,3 +97,13 @@ test('production inline scripts are syntactically valid',()=>{
   const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
   for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!match[1].includes('src='))new vm.Script(match[2]);
 });
+
+test('per-student submitted flag is preserved on restart without replacing the player row',async()=>{
+  const f=fixture(()=>response({state:'writing',players:{student:{name:'시연봇 01',submitted:true}},problems:{},votes:{}}));
+  const ref=f.db.ref('rooms/JJG_DEMO/players/student/submitted');
+  await ref.set(false);
+  const write=f.requests.find(r=>r.method==='PUT');
+  assert.equal(JSON.parse(write.body).name,'시연봇 01');
+  assert.equal(JSON.parse(write.body).submitted,false);
+  assert.ok(write.headers['X-Request-Id']);f.cleanup();
+});

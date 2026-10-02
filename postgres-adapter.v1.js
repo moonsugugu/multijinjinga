@@ -165,8 +165,9 @@
   }
   async function writePath(code, path, value, mode) {
     const st = storeFor(code);
-    if (!st.tree && mode !== 'set') await st.load();
     const parts = String(path || '').split('/').filter(Boolean);
+    const needsCurrent = (parts[0] === 'players' && parts.length > 2) || (ROOM_FIELDS.has(parts[0]) && parts.length > 1);
+    if (!st.tree && (mode !== 'set' || needsCurrent)) await st.load();
     if (!parts.length) {
       if (mode === 'remove') { await req(`/v1/jinjinga/rooms/${enc(code)}`, {method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}}); st.tree=null; st.notifyAll(); return; }
       if (mode === 'set') {
@@ -201,7 +202,9 @@
     if(head==='players' && rest[0]) {
       const pid=rest[0], url=`/v1/jinjinga/rooms/${enc(code)}/players/${enc(pid)}`;
       if(mode==='remove') return req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}});
-      const merged={...(clone(st.read(`players/${pid}`))||{}),...(value||{})};
+      const merged=clone(st.read(`players/${pid}`))||{};
+      if(rest.length>1)setNested(merged,rest.slice(1),value,mode==='remove');
+      else Object.assign(merged,value||{});
       for(const k of Object.keys(merged)) merged[k]=resolveTS(merged[k]);
       return req(url,json('PUT',merged));
     }

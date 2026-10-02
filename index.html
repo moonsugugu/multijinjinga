@@ -340,6 +340,7 @@
 .audit-qr-image img,.audit-qr-image canvas{margin:auto;max-width:100%;width:min(100%,calc(100dvh - 260px));height:auto!important;}
 .audit-qr-size{display:flex;align-items:center;gap:12px;margin:16px 0;}.audit-qr-size label{flex:1;}.audit-qr-size input{display:block;width:100%;}
 #qrcode,#tp-qr{cursor:pointer;border:0;background:transparent;width:100%;}
+.demo-controls{border:2px solid #c4b5fd}.demo-controls .row{margin-top:12px;flex-wrap:wrap}.demo-controls .row button{min-width:110px;flex:1;}
 </style>
 </head>
 <body>
@@ -407,6 +408,13 @@
     <div class="topbar">
       <span class="pill">👩‍🏫 <span id="lobby-topic"></span></span>
       <button class="btn warn" style="width:auto; padding:8px 14px; font-size:13px" id="btn-close-room">방 닫기</button>
+    </div>
+    <div class="card demo-controls">
+      <h2>🤖 촬영용 가상 학생</h2>
+      <p class="muted">주제별 100개의 가상 취향 소개 중에서 문제를 제출해요. 투표 정답률도 문제마다 달라져요. 학생이 없는 방에서 시작해 주세요.</p>
+      <label for="demo-topic">시연 주제</label><select id="demo-topic"><option value="food">음식 취향 소개</option><option value="sport">운동 취향 소개</option><option value="animal">동물 취향 소개</option></select>
+      <div class="row"><button id="btn-demo-one" class="btn secondary">봇 1명 추가</button><button id="btn-demo-five" class="btn secondary">봇 5명 추가</button><button id="btn-demo-max" class="btn">최대 50명 채우기</button></div>
+      <button id="btn-demo-clear" class="btn secondary" style="margin-top:10px">시연 봇 비우기</button><p id="demo-status" role="status" class="muted"></p>
     </div>
     <div class="card center">
       <h2>📱 학생들은 QR을 찍어 주세요</h2>
@@ -526,6 +534,7 @@
       <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
       <button class="btn good" id="btn-next-q">다음 →</button>
     </div>
+    <div id="demo-present-controls" class="card hidden"><b>🤖 가상 학생 시연 중</b><button id="btn-demo-pause" class="btn secondary" style="margin-top:8px">봇 일시정지</button><p class="muted">봇은 자기 발표를 제외하고 실제 투표에 참여해요.</p></div>
     <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 숨기기</button>
     <div class="card" id="tp-joincard" style="margin-top:12px">
       <h2 class="center" style="margin-bottom:6px">📲 늦게 들어오거나 튕긴 학생용</h2>
@@ -611,6 +620,7 @@
      postgres-adapter.v1.js 가 Firebase RTDB 문법을 그대로 받아 PostgreSQL로 번역하므로
      아래 앱 코드는 예전 그대로입니다. -->
 <script src="./postgres-adapter.v1.js"></script>
+<script src="./demo-bots.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════
@@ -967,6 +977,7 @@ function unsubscribeAll(list){ list.forEach(({ref,h})=>ref.off("value",h)); list
 
 function attachRoom(){
   detachRoom();
+  demoController.start();
   S.room = {};
   // 작은 것들만 상시 구독 (전부 합쳐도 몇 KB)
   subscribe(SUBS, "state", v=>{
@@ -1009,6 +1020,7 @@ async function loadAllForDone(){
   render();
 }
 function detachRoom(){
+  demoController.stop();
   clearTimeout(renderTimer); renderTimer=null;
   unsubscribeAll(SUBS); unsubscribeAll(CURSUBS);
   S.curOwner = null; S.doneLoaded = false; S.doneLoading = false;
@@ -1079,6 +1091,7 @@ function ensureJoinQR(){
   $("tp-joinurl").textContent = joinUrl();
 }
 function renderLobby(){
+  updateDemoControls();
   $("lobby-topic").textContent = S.room.topic || "진진가";
   if(!S.qrDone){
     S.qrDone = true;
@@ -1126,6 +1139,7 @@ function ownerProblem(owner){ return (S.room.problems||{})[owner]; }
 function votesFor(owner){ return (S.room.votes||{})[owner] || {}; }
 
 function renderTPresent(){
+  $("demo-present-controls").classList.toggle("hidden",!S.room.settings?.demoTopic);
   const room = S.room, pres = room.present || {order:[],idx:0};
   const owner = currentOwner(), prob = ownerProblem(owner), players = room.players||{};
   $("tp-code").textContent = S.code;
@@ -1735,8 +1749,39 @@ function syncFx(pres, owner, prob){
   }
 }
 
+const demoController=JJGDemo.createController({
+  getContext:()=>({role:S.role,code:S.code,room:S.room,ref:S.code?roomRef():null}),
+  loadBank:async()=>{const response=await fetch('./demo-bank.json');if(!response.ok)throw Error('시연 예시를 읽지 못했어요.');return response.json();},
+  onStatus:text=>{S.demoStatus=text;updateDemoControls();}
+});
+function updateDemoControls(){
+  const settings=S.room?.settings||{}, count=(settings.demoBotIds||[]).filter(id=>S.room?.players?.[id]).length;
+  const full=Object.keys(S.room?.players||{}).length>=MAX_PLAYERS;
+  for(const id of ['btn-demo-one','btn-demo-five','btn-demo-max']) $(id).disabled=S.demoPending||demoController.busy||full;
+  $('btn-demo-clear').disabled=S.demoPending||demoController.busy||!count;
+  $('demo-topic').disabled=Boolean(settings.demoTopic)||S.demoPending||demoController.busy;
+  if(settings.demoTopic)$('demo-topic').value=settings.demoTopic;
+  $('btn-demo-pause').textContent=demoController.paused?'봇 계속 진행':'봇 일시정지';
+  $('demo-status').textContent=S.demoStatus||(count?'시연 모드 · 봇 '+count+'명 / 학생 최대 50명':'시연 주제로 바뀌며 선생님은 학생 수에 포함되지 않아요.');
+}
+async function demoCommand(action){
+  if(S.demoPending)return;
+  S.demoPending=true;
+  for(const id of ['btn-demo-one','btn-demo-five','btn-demo-max','btn-demo-clear'])$(id).disabled=true;
+  try {await action();}catch(error){flash(error.message||'봇 작업을 완료하지 못했어요.');}
+  finally {S.demoPending=false;updateDemoControls();}
+}
+async function demoLoop(){
+  try{await demoController.tick();}catch(error){flash(error.message||'시연 봇 연결을 확인해 주세요.');}
+  setTimeout(demoLoop,S.role==='teacher'&&S.room?.settings?.demoTopic?150:1000);
+}
+
 /* ─────────── 이벤트 연결 ─────────── */
 function wire(){
+  for(const [id,count] of [['btn-demo-one',1],['btn-demo-five',5],['btn-demo-max',50]]) $(id).onclick=()=>demoCommand(()=>demoController.add($('demo-topic').value,count));
+  $('btn-demo-clear').onclick=()=>demoCommand(()=>demoController.clear());
+  $('btn-demo-pause').onclick=()=>{const paused=demoController.pause();$('btn-demo-pause').textContent=paused?'봇 계속 진행':'봇 일시정지';};
+  void demoLoop();
   for(const id of ['qrcode','tp-qr']) $(id).onclick=openJoinQr;
 
   $("btn-create").onclick = async ()=>{
