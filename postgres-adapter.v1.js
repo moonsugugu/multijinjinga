@@ -20,10 +20,12 @@
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   async function req(path, options = {}) {
     const method = options.method || 'GET';
-    if (method !== 'GET') {
-      const requestId = options.headers?.['X-Request-Id'] || crypto.randomUUID();
-      options = {...options, headers:{...options.headers, 'X-Request-Id':requestId}};
-      if (options.body) options.body = JSON.stringify({...JSON.parse(options.body), requestId});
+    /* requestId 는 본문에만 싣는다. 서버 CORS 가 허용하는 요청 헤더는 Content-Type, Authorization 뿐이라
+       X-Request-Id 같은 커스텀 헤더를 붙이면 브라우저가 preflight 에서 요청을 막는다(모든 쓰기가 Failed to fetch).
+       재시도는 아래 루프가 같은 options 를 재사용하므로 같은 requestId 가 간다. */
+    if (method !== 'GET' && options.body) {
+      const body = JSON.parse(options.body);
+      options = {...options, body: JSON.stringify({...body, requestId: body.requestId || crypto.randomUUID()})};
     }
     for (let attempt = 0; ; attempt++) {
       const controller = new AbortController();
@@ -169,7 +171,7 @@
     const needsCurrent = (parts[0] === 'players' && parts.length > 2) || (ROOM_FIELDS.has(parts[0]) && parts.length > 1);
     if (!st.tree && (mode !== 'set' || needsCurrent)) await st.load();
     if (!parts.length) {
-      if (mode === 'remove') { await req(`/v1/jinjinga/rooms/${enc(code)}`, {method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}}); st.tree=null; st.notifyAll(); return; }
+      if (mode === 'remove') { await req(`/v1/jinjinga/rooms/${enc(code)}`, {method:'DELETE'}); st.tree=null; st.notifyAll(); return; }
       if (mode === 'set') {
         const b = clone(value || {}); for (const k of Object.keys(b)) b[k] = resolveTS(b[k]);
         const room = await req(`/v1/jinjinga/rooms/${enc(code)}`, json('POST', b));
@@ -201,7 +203,7 @@
     }
     if(head==='players' && rest[0]) {
       const pid=rest[0], url=`/v1/jinjinga/rooms/${enc(code)}/players/${enc(pid)}`;
-      if(mode==='remove') return req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}});
+      if(mode==='remove') return req(url,{method:'DELETE'});
       const merged=clone(st.read(`players/${pid}`))||{};
       if(rest.length>1)setNested(merged,rest.slice(1),value,mode==='remove');
       else Object.assign(merged,value||{});
@@ -210,14 +212,14 @@
     }
     if(head==='problems' && rest[0]) {
       const pid=rest[0], url=`/v1/jinjinga/rooms/${enc(code)}/problems/${enc(pid)}`;
-      if(mode==='remove') return req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}});
+      if(mode==='remove') return req(url,{method:'DELETE'});
       const merged={...(clone(st.read(`problems/${pid}`))||{}),...(value||{})};
       for(const k of Object.keys(merged)) merged[k]=resolveTS(merged[k]);
       return req(url,json('PUT',merged));
     }
     if(head==='votes' && rest[0] && rest[1]) {
       const url=`/v1/jinjinga/rooms/${enc(code)}/votes/${enc(rest[0])}/${enc(rest[1])}`;
-      return mode==='remove' ? req(url,{method:'DELETE',headers:{'X-Request-Id':crypto.randomUUID()}}) : req(url,json('PUT',{choice:Number(value)}));
+      return mode==='remove' ? req(url,{method:'DELETE'}) : req(url,json('PUT',{choice:Number(value)}));
     }
   }
 

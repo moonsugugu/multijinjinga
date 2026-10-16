@@ -74,7 +74,7 @@ test('room deletion followed by a child deletion cannot crash',async()=>{
 test('25 concurrent writes use distinct rows and preserve each requestId across retries',async()=>{
   const ids=new Set(),rows=new Map(),attempts=new Map();let mutations=0;
   const f=fixture((url,options)=>{
-    const body=JSON.parse(options.body);assert.equal(body.requestId,options.headers['X-Request-Id']);
+    const body=JSON.parse(options.body);assert.ok(body.requestId);
     attempts.set(body.requestId,(attempts.get(body.requestId)||0)+1);
     if(!ids.has(body.requestId)){ids.add(body.requestId);rows.set(url,body);mutations++;return response(null,503);}
     return response(body);
@@ -91,7 +91,7 @@ for(const status of [409,503,'offline','timeout'])test(`bounded retries for ${st
   });
   await assert.rejects(f.db.ref('rooms/JJG_AAAA/votes/owner/voter').set(1));
   assert.equal(f.requests.length,4);
-  assert.equal(new Set(f.requests.map(r=>r.headers['X-Request-Id'])).size,1);f.cleanup();
+  assert.equal(new Set(f.requests.map(r=>JSON.parse(r.body).requestId)).size,1);f.cleanup();
 });
 test('production inline scripts are syntactically valid',()=>{
   const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -105,5 +105,22 @@ test('per-student submitted flag is preserved on restart without replacing the p
   const write=f.requests.find(r=>r.method==='PUT');
   assert.equal(JSON.parse(write.body).name,'시연봇 01');
   assert.equal(JSON.parse(write.body).submitted,false);
-  assert.ok(write.headers['X-Request-Id']);f.cleanup();
+  assert.ok(JSON.parse(write.body).requestId);f.cleanup();
+});
+test('every request only sends headers the server CORS allows (방 만들기가 CORS 로 막힌 사고 재발 방지)',async()=>{
+  const allowed=new Set(['content-type','authorization']);   // api.moonsunezip.com 의 Access-Control-Allow-Headers
+  const f=fixture(()=>response({state:'writing',players:{},problems:{},votes:{}}));
+  const room=f.db.ref('rooms/JJG_AAAA');
+  await room.set({state:'writing',topic:'t',createdAt:{'.sv':'timestamp'}});
+  await room.child('state').set('voting');
+  await room.child('players/p1').set({name:'a'});
+  await room.child('players/p1').remove();
+  await room.child('problems/p1').remove();
+  await room.child('votes/o/v').set(1);
+  await room.child('votes/o/v').remove();
+  await room.remove();
+  assert.ok(f.requests.length>=8);
+  for(const r of f.requests)for(const h of Object.keys(r.headers||{}))
+    assert.ok(allowed.has(h.toLowerCase()),`${r.method||'GET'} ${r.url} 가 CORS 비허용 헤더 ${h} 를 보냄`);
+  f.cleanup();
 });
