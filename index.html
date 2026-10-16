@@ -619,7 +619,7 @@
 <!-- Firebase 대신 문수네집 홈서버의 PostgreSQL API를 사용합니다.
      postgres-adapter.v1.js 가 Firebase RTDB 문법을 그대로 받아 PostgreSQL로 번역하므로
      아래 앱 코드는 예전 그대로입니다. -->
-<script src="./postgres-adapter.v1.js"></script>
+<script src="./postgres-adapter.v1.js?v=20261016"></script><!-- 어댑터는 서버가 4시간 캐시하므로, 어댑터를 고칠 때마다 v= 값을 바꿔야 학생·선생님 기기가 새 파일을 받는다 -->
 <script src="./demo-bots.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
