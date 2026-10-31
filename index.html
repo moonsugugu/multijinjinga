@@ -453,6 +453,14 @@
       <button class="btn good" id="al-toggle" style="margin-top:12px">⏳ 자동 제한시간 켜짐</button>
     </div>
 
+    <div class="card">
+      <h2>⏭️ 정답 공개 후 자동으로 다음 문제</h2>
+      <p class="muted">정답을 확인한 뒤 선택한 시간이 지나면 다음 문제로 넘어가요. 마지막 문제에서는 결과를 보여줘요. 선생님 화면을 열어 두세요.</p>
+      <label class="f" for="an-seconds">정답을 보여줄 시간</label>
+      <select id="an-seconds"><option value="5">5초</option><option value="6">6초</option><option value="7">7초</option><option value="8">8초</option><option value="9">9초</option><option value="10">10초</option></select>
+      <button class="btn secondary" id="an-toggle" style="margin-top:12px">자동 다음 문제 꺼짐</button>
+    </div>
+
     <button class="btn big good" id="btn-start-present">🎬 발표 시작하기</button>
     <div class="muted center" style="margin-top:8px">제출을 마친 학생들의 문제부터 순서대로 보여줘요.</div>
   </section>
@@ -462,8 +470,9 @@
     <h1>🎭 멀티진진가</h1>
     <p class="tagline">방 코드: <b id="join-code-label"></b></p>
     <div class="card">
-      <h2>🙋 이름을 알려 주세요</h2>
-      <input type="text" id="in-name" placeholder="이름 입력 (예: 김하늘)" maxlength="12">
+      <h2><label for="in-name">🙋 닉네임 또는 번호를 적어 주세요</label></h2>
+      <input type="text" id="in-name" placeholder="예: 당근탐정 또는 12" maxlength="12" aria-describedby="join-name-help">
+      <p class="muted" id="join-name-help">적은 닉네임을 꼭 기억하세요. 다시 들어올 때 <b>같은 닉네임</b>을 적으면 하던 자리로 돌아와요.<br>선생님 안내에 따라 <b>번호만 적어도 돼요.</b> 다른 친구와 겹치지 않게 적어 주세요.</p>
       <button class="btn big" id="btn-join" style="margin-top:12px">입장하기</button>
     </div>
   </section>
@@ -534,6 +543,11 @@
       <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
       <button class="btn good" id="btn-next-q">다음 →</button>
     </div>
+    <div class="card" style="margin-top:12px">
+      <label class="f" for="tp-an-seconds">⏭️ 정답 공개 후 자동으로 다음 문제</label>
+      <div class="row"><select id="tp-an-seconds" style="flex:0 0 90px"><option value="5">5초</option><option value="6">6초</option><option value="7">7초</option><option value="8">8초</option><option value="9">9초</option><option value="10">10초</option></select><button class="btn secondary" id="tp-an-toggle">자동 다음 문제 꺼짐</button></div>
+      <p class="muted center" id="tp-an-status" style="margin-bottom:0"></p>
+    </div>
     <div id="demo-present-controls" class="card hidden"><b>🤖 봇 학생 참여 중</b><button id="btn-demo-pause" class="btn secondary" style="margin-top:8px">봇 일시정지</button><p class="muted">봇은 자기 발표를 제외하고 실제 투표에 참여해요.</p></div>
     <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 숨기기</button>
     <div class="card" id="tp-joincard" style="margin-top:12px">
@@ -562,6 +576,7 @@
     <div class="opts" id="sp-opts"></div>
     <div class="center muted" id="sp-hint" style="margin-top:14px"></div>
     <div class="reveal-box hidden" id="sp-reveal"></div>
+    <p class="muted center" id="sp-an-status"></p>
   </section>
 
   <!-- ══════════ 결과 ══════════ -->
@@ -612,6 +627,8 @@
       <div class="chips" id="am-winners"></div>
     </div>
     <div class="stat" id="am-stat"></div>
+    <p class="muted center" id="am-an-status"></p>
+    <button class="btn secondary hidden" id="am-an-toggle" style="margin-bottom:10px">자동 다음 문제 멈추기</button>
     <button class="btn big" id="am-close">확인</button>
   </div>
 </div>
@@ -694,6 +711,54 @@ function limitOf(){
   const st = (S.room && S.room.settings) || {};
   return { on: st.autoOn !== false, sec: st.limitSec || DEF_LIMIT_SEC };
 }
+function autoNextOf(){
+  const st=S.room?.settings||{}, value=Number(st.nextSec);
+  return {on:st.nextOn===true,sec:Number.isFinite(value)?Math.min(10,Math.max(5,Math.round(value))):5};
+}
+async function setAutoNext(on,sec){
+  if(S.role!=="teacher"||!S.room)return;
+  const room=S.room,code=S.code;
+  const value=Number(sec), seconds=Number.isFinite(value)?Math.min(10,Math.max(5,Math.round(value))):5;
+  const patch={settings:{...S.room.settings,nextOn:!!on,nextSec:seconds}};
+  const p=S.room.present;
+  if(S.room.state==="presenting"&&p?.revealed)patch["present/nextAt"]=on?srvNow()+seconds*1000:null;
+  await roomRef().update(patch);
+  // 저장 성공 뒤에는 소켓 알림을 기다리지 않고 멈춤을 적용한다.
+  if(S.code===code&&S.room===room){
+    S.room.settings=patch.settings;
+    if("present/nextAt" in patch&&S.room.present?.idx===p.idx)S.room.present.nextAt=patch["present/nextAt"];
+    S.autoNextFailed=null;S.autoNextFired=null;
+  }
+}
+function toggleAutoNext(){const n=autoNextOf();return setAutoNext(!n.on,n.sec);}
+function renderAutoNextControls(){
+  const n=autoNextOf();
+  for(const id of ["an-seconds","tp-an-seconds"]){$(id).value=String(n.sec);$(id).disabled=!!S.teacherBusy;}
+  for(const id of ["an-toggle","tp-an-toggle","am-an-toggle"]){
+    const b=$(id);b.textContent=n.on?"⏭️ 자동 다음 문제 켜짐":"자동 다음 문제 꺼짐";
+    if(id==="am-an-toggle")b.textContent=n.on?"⏸️ 자동 다음 문제 멈추기":"▶️ 자동 다음 문제 켜기";
+    b.classList.toggle("good",n.on);b.classList.toggle("secondary",!n.on);b.setAttribute("aria-pressed",String(n.on));b.disabled=!!S.teacherBusy;
+  }
+  $("am-an-toggle").classList.toggle("hidden",S.role!=="teacher"||S.room?.state!=="presenting");
+}
+function autoNextKey(){const p=S.room?.present;return S.code+"|"+p?.idx+"|"+p?.nextAt;}
+function renderAutoNextProgress(){
+  const n=autoNextOf(),p=S.room?.present, presenting=S.room?.state==="presenting";
+  let text="";
+  if(presenting&&n.on){
+    const last=p?.idx+1>=p?.order?.length, target=last?"결과 화면으로":"다음 문제로";
+    text=p?.revealed&&p.nextAt?`${Math.max(0,Math.ceil((p.nextAt-srvNow())/1000))}초 후 ${target} 넘어가요.`:`정답 공개 후 ${n.sec}초 뒤에 자동으로 넘어가요.`;
+    if(S.autoNextFailed===autoNextKey())text="자동 이동을 저장하지 못했어요. 선생님이 다음 버튼을 눌러 주세요.";
+  }else if(presenting&&S.role==="teacher")text="자동 이동이 꺼져 있어요. 다음 버튼으로 진행하세요.";
+  for(const id of ["tp-an-status","sp-an-status","am-an-status"])$(id).textContent=text;
+}
+async function autoNextTick(){
+  const p=S.room?.present,key=autoNextKey();
+  if(S.role!=="teacher"||S.room?.state!=="presenting"||!autoNextOf().on||!p?.revealed||!p.nextAt||p.nextAt>srvNow()||S.teacherBusy||S.presentPending||S.autoNextFired===key||S.autoNextFailed===key)return;
+  S.autoNextFired=key;
+  try{await nextProblem();}
+  catch{S.autoNextFailed=key;flash("자동 이동을 저장하지 못했어요. 다음 버튼을 눌러 주세요.");}
+}
 
 /* 선생님만 쓰는 조작 */
 async function wtToggle(){
@@ -772,7 +837,7 @@ function renderQTimer(){
   bar.classList.toggle("warn", rem<=10 && rem>5);
   bar.classList.toggle("hurry", rem<=5);
   if(isT && left<=5 && left>0 && S.lastBeep!==left){ S.lastBeep=left; SFX.beep(); }
-  if(isT && rem<=0 && !S.autoFiring){          // 시간 끝 → 자동으로 3·2·1 공개
+  if(isT && rem<=0 && !S.autoFiring && !S.teacherBusy && !S.presentPending){          // 시간 끝 → 자동으로 3·2·1 공개
     S.autoFiring = true;
     Promise.resolve(revealAnswer()).finally(()=>{ S.autoFiring=false; });
   }
@@ -793,6 +858,8 @@ function timerTick(){
     }
   } else if(state==="presenting"){
     renderQTimer();
+    renderAutoNextProgress();
+    void autoNextTick();
   }
 }
 
@@ -915,7 +982,7 @@ async function doCreateRoom(){
     ownerUid: uid,          // 이 방의 주인(선생님). 규칙이 이걸로 권한을 판단한다.
     state:"writing", topic,
     writeTimer:{ dur:DEF_WRITE_SEC, remain:DEF_WRITE_SEC, running:false, endsAt:null },
-    settings:{ autoOn:true, limitSec:DEF_LIMIT_SEC },
+    settings:{ autoOn:true, limitSec:DEF_LIMIT_SEC, nextOn:false, nextSec:5 },
   });
   await indexRef().child(S.code).set(firebase.database.ServerValue.TIMESTAMP);
   saveSession(); attachRoom();
@@ -1024,6 +1091,7 @@ function detachRoom(){
   clearTimeout(renderTimer); renderTimer=null;
   unsubscribeAll(SUBS); unsubscribeAll(CURSUBS);
   S.curOwner = null; S.doneLoaded = false; S.doneLoading = false;
+  S.autoNextFired=null;S.autoNextFailed=null;
 }
 function goHome(){
   detachRoom(); clearSession();
@@ -1111,7 +1179,7 @@ function renderLobby(){
   $("lobby-players").innerHTML = list.length
     ? list.map(([,p])=>`<span class="chip ${p.submitted?"done":"writing"}">${esc(p.name)} ${p.submitted?"✅":"✍️"}</span>`).join("")
     : '<span class="muted">아직 입장한 학생이 없어요...</span>';
-  renderWTControls(); renderALControls();
+  renderWTControls(); renderALControls(); renderAutoNextControls();
   $("btn-start-present").disabled = done===0;
   $("btn-start-present").textContent = done===0 ? "제출한 학생을 기다려요..."
     : (done<list.length ? `🎬 발표 시작 (${done}명 제출됨, ${list.length-done}명 아직)` : "🎬 발표 시작하기 (전원 완료!)");
@@ -1127,7 +1195,7 @@ async function startPresenting(){
   SFX.init(); // 클릭한 지금 오디오를 열어 둬야 배경음악이 나올 수 있어요
   await roomRef().update({
     state:"presenting",
-    present:{ order, idx:0, revealed:false, countdown:null, deadline:null },
+    present:{ order, idx:0, revealed:false, countdown:null, deadline:null, nextAt:null },
     votes:null,
     writeTimer:{ ...wtOf(), running:false, endsAt:null, remain:wtOf().dur }   // 작성 타이머는 멈춰 둔다
   });
@@ -1188,11 +1256,12 @@ function renderTPresent(){
   renderQTimer();
 
   $("btn-reveal").style.display = revealed ? "none" : "block";
-  $("btn-reveal").disabled = !!pres.countdown;
+  $("btn-reveal").disabled = !!pres.countdown && S.revealFailed!==pres.countdown;
   $("btn-next-q").textContent = (pres.idx+1>=pres.order.length) ? "🏁 결과 보기" : "다음 →";
   $("btn-prev-q").disabled = pres.idx===0;
 
   syncFx(pres, owner, prob);
+  renderAutoNextControls();renderAutoNextProgress();
 }
 function countVoters(owner){
   // 문제 주인을 제외한 참여 학생 수는 알 수 없으니 실제 투표수 기준
@@ -1211,13 +1280,19 @@ async function revealAnswer(){
   await roomRef().update({ "present/countdown":Date.now(), "present/deadline":null });
 }
 async function nextProblem(){
+  if(S.role!=="teacher"||S.room?.state!=="presenting"||S.presentPending)return;
+  S.presentPending=true;
+  try{
   const p=S.room.present, ni=p.idx+1;
-  if(ni>=p.order.length){ await roomRef().update({ state:"done" }); }
-  else await roomRef().update({ "present/idx":ni, "present/revealed":false, "present/countdown":null, "present/deadline":null });
+  if(ni>=p.order.length){ await roomRef().update({ state:"done", "present/nextAt":null }); }
+  else await roomRef().update({ "present/idx":ni, "present/revealed":false, "present/countdown":null, "present/deadline":null, "present/nextAt":null });
+  }finally{S.presentPending=false;}
 }
 async function prevProblem(){
-  const p=S.room.present; if(p.idx<=0) return;
-  await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false, "present/countdown":null, "present/deadline":null });
+  const p=S.room?.present; if(S.role!=="teacher"||S.room?.state!=="presenting"||!p||p.idx<=0||S.presentPending)return;
+  S.presentPending=true;
+  try{await roomRef().update({ "present/idx":p.idx-1, "present/revealed":false, "present/countdown":null, "present/deadline":null, "present/nextAt":null });}
+  finally{S.presentPending=false;}
 }
 async function endPresent(){ if(confirm("게임을 종료하고 결과를 볼까요?")) await roomRef().update({ state:"done" }); }
 
@@ -1274,6 +1349,7 @@ function renderSPresent(){
   } else rb.classList.add("hidden");
 
   renderQTimer();   // 0.25초 타이머를 기다리지 않고 화면 그릴 때 바로 표시
+  renderAutoNextProgress();
   syncFx(pres, owner, prob);
 }
 async function castVote(i){
@@ -1729,14 +1805,21 @@ function hideAnswerModal(){ $("ansmodal").classList.remove("on"); Confetti.stop(
 function syncFx(pres, owner, prob){
   const key = pres.idx+"|"+owner;
   if(S.fxKey !== key){           // 다른 문제로 넘어가면 전부 초기화
-    S.fxKey=key; S.cdSeen=null; S.revealSeen=false; S.lastBeep=null;
+    S.fxKey=key; S.cdSeen=null; S.revealSeen=false; S.lastBeep=null;S.revealFailed=null;
     stopCountdown(); hideAnswerModal();
   }
   const cd = pres.countdown || 0;
 
   if(!pres.revealed && cd && S.cdSeen!==cd){
     S.cdSeen = cd;
-    runCountdown(()=>{ if(S.role==="teacher") roomRef().child("present/revealed").set(true); });
+    const code=S.code,idx=pres.idx;
+    runCountdown(async()=>{
+      const p=S.room?.present;
+      if(S.role!=="teacher"||S.code!==code||S.room?.state!=="presenting"||p?.idx!==idx||p.countdown!==cd||p.revealed)return;
+      const n=autoNextOf();
+      try{await roomRef().update({"present/revealed":true,"present/nextAt":n.on?srvNow()+n.sec*1000:null});}
+      catch{S.revealFailed=cd;scheduleRender();flash("정답을 공개하지 못했어요. 정답 공개 버튼을 다시 눌러 주세요.");}
+    });
   }
   if(pres.revealed){
     if(!S.revealSeen){ S.revealSeen=true; stopCountdown(); showAnswerModal(owner, prob); }
@@ -1845,6 +1928,8 @@ function wire(){
   $("al-plus").onclick  = ()=>alAdjust(5);
   $("al-minus").onclick = ()=>alAdjust(-5);
   $("al-toggle").onclick = alToggle;
+  for(const id of ["an-toggle","tp-an-toggle","am-an-toggle"])$(id).onclick=toggleAutoNext;
+  for(const id of ["an-seconds","tp-an-seconds"])$(id).onchange=event=>runTeacherAction($(id),()=>setAutoNext(autoNextOf().on,event.target.value),event);
 
   $("btn-toggle-joinqr").onclick = ()=>{
     const c=$("tp-joincard"), hidden=c.classList.toggle("hidden");
@@ -1854,21 +1939,23 @@ function wire(){
   $("btn-bgm").onclick = ()=>{ SFX.init(); BGM.toggle(); };
   $("am-close").onclick = hideAnswerModal;
   $("ansmodal").addEventListener("click", e=>{ if(e.target.id==="ansmodal") hideAnswerModal(); });
-  for(const id of ['btn-start-present','btn-close-room','btn-reveal','btn-next-q','btn-prev-q','btn-end-present','btn-again','wt-start','wt-reset','wt-plus','wt-minus','al-plus','al-minus','al-toggle']){
+  for(const id of ['btn-start-present','btn-close-room','btn-reveal','btn-next-q','btn-prev-q','btn-end-present','btn-again','wt-start','wt-reset','wt-plus','wt-minus','al-plus','al-minus','al-toggle','an-toggle','tp-an-toggle','am-an-toggle']){
     const button=$(id), action=button.onclick;
-    button.onclick=async event=>{
+    button.onclick=event=>runTeacherAction(button,action,event);
+  }
+}
+async function runTeacherAction(button,action,event){
       if(S.teacherBusy) return;
+      if(S.presentPending)return;
       S.teacherBusy=true; button.disabled=true; button.setAttribute('aria-busy','true');
-      const label=button.textContent; button.textContent='처리 중…';
+      const isButton=button.tagName==="BUTTON",label=button.textContent;if(isButton)button.textContent='처리 중…';
       try { await action(event); }
       catch { flash('저장하지 못했어요. 연결을 확인한 뒤 다시 눌러 주세요.'); }
       finally {
         S.teacherBusy=false; button.disabled=false; button.removeAttribute('aria-busy');
-        if(button.textContent==='처리 중…') button.textContent=label;
+        if(isButton&&button.textContent==='처리 중…') button.textContent=label;
         scheduleRender();
       }
-    };
-  }
 }
 
 /* ─────────── 시작 ─────────── */
