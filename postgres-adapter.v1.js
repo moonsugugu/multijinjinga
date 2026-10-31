@@ -194,7 +194,15 @@
     const [head,...rest]=parts;
     if(ROOM_FIELDS.has(head)) {
       if(!rest.length) {
-        const updated=await req(`/v1/jinjinga/rooms/${enc(code)}`,json('PATCH',{[head]:mode==='remove'?null:resolveTS(value)}));
+        let next=mode==='remove'?null:resolveTS(value);
+        /* Firebase 의 update 는 하위 값을 합친다. settings 를 통째로 바꾸면 봇 목록(demoTopic·demoBotIds)이
+           선생님이 제한시간만 바꿔도 사라져 봇 투표가 멈췄다. 객체끼리는 기존 값에 합쳐 보낸다. */
+        const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+        if(mode==='update'&&isObj(next)&&isObj(st.read(head))) {
+          next={...clone(st.read(head)),...next};
+          for(const k of Object.keys(next)) next[k]=resolveTS(next[k]);
+        }
+        const updated=await req(`/v1/jinjinga/rooms/${enc(code)}`,json('PATCH',{[head]:next}));
         if(st.tree&&updated)Object.assign(st.tree,updated); return updated;
       }
       const current=clone(st.read(head)||{}); setNested(current,rest,value,mode==='remove');

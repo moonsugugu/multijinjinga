@@ -33,17 +33,23 @@
       const stamp=generation;
       const topics=await bank(), topic=topics.find(item=>item.id===topicId);
       if(generation!==stamp || getContext()?.code!==context.code)throw Error('방이 바뀌어 봇 생성을 멈췄어요.');
-      if(!topic)throw Error('음식·운동·동물 시연 주제를 골라 주세요.');
+      if(!topic)throw Error('봇 주제를 골라 주세요.');
       const settings=context.room.settings || {}, oldIds=ids(context);
-      if(settings.demoTopic && settings.demoTopic!==topicId)throw Error('주제를 바꾸려면 시연 봇을 먼저 비워 주세요.');
-      if(!settings.demoTopic && Object.keys(context.room.players||{}).length)throw Error('학생이 없는 방에서 시연 봇을 추가해 주세요.');
+      if(settings.demoTopic && settings.demoTopic!==topicId)throw Error('주제를 바꾸려면 봇을 먼저 비워 주세요.');
       const capacity=MAX_PLAYERS-Object.keys(context.room.players||{}).length;
       if(capacity<=0)throw Error('50명이 모두 들어와 있어요.');
       busy=true;stopped=false;paused=false;
       const code=context.code, ref=context.ref;
       const addedIds=oldIds.slice();workingIds=addedIds;
       const profiles=topic.profiles.map(profile=>({profile,key:Math.random()})).sort((a,b)=>a.key-b.key);
-      const save=()=>ref.update({topic:topic.label,settings:{...settings,demoTopic:topicId,demoBotIds:addedIds.slice()}});
+      // 실제 학생이 이미 있으면 선생님이 정한 방 주제를 그대로 둔다. 봇만 있는 촬영 방은 봇 주제로 바꾼다.
+      const realStudents=Object.keys(context.room.players||{}).some(id=>!oldIds.includes(id));
+      // 저장 직전의 설정을 다시 읽어, 그사이 선생님이 바꾼 제한시간 같은 값을 덮어쓰지 않는다.
+      const save=()=>{
+        const patch={settings:{...(getContext()?.room?.settings||settings),demoTopic:topicId,demoBotIds:addedIds.slice()}};
+        if(!realStudents)patch.topic=topic.label;
+        return ref.update(patch);
+      };
       try {
         await save();
         for(let i=0;i<Math.min(count,capacity);i++) {
