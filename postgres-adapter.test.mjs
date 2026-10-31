@@ -124,3 +124,16 @@ test('every request only sends headers the server CORS allows (방 만들기가 
     assert.ok(allowed.has(h.toLowerCase()),`${r.method||'GET'} ${r.url} 가 CORS 비허용 헤더 ${h} 를 보냄`);
   f.cleanup();
 });
+test('settings update merges like Firebase so the bot list survives a time-limit change',async()=>{
+  const room={state:'writing',players:{},problems:{},votes:{},settings:{autoOn:true,limitSec:20,demoTopic:'intro',demoBotIds:['b1','b2']}};
+  const f=fixture((url,options)=>{
+    if((options.method||'GET')==='GET')return response(room);
+    const body=JSON.parse(options.body);return response({settings:body.settings});
+  });
+  await f.db.ref('rooms/JJG_AAAA/settings').update({autoOn:true,limitSec:25});
+  const sent=JSON.parse(f.requests.find(r=>r.method==='PATCH').body).settings;
+  assert.equal(sent.limitSec,25);assert.equal(sent.demoTopic,'intro');assert.deepEqual(sent.demoBotIds,['b1','b2']);
+  await f.db.ref('rooms/JJG_AAAA/settings').set({autoOn:false});
+  const replaced=JSON.parse(f.requests.filter(r=>r.method==='PATCH').at(-1).body).settings;
+  assert.deepEqual(replaced,{autoOn:false});f.cleanup();
+});

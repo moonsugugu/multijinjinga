@@ -22,13 +22,43 @@ function fixture() {
   const controller=api.createController({getContext:()=>state,loadBank:async()=>bank,sleep:async()=>{}});
   return {state,writes,controller};
 }
-test('3 demo themes contain 100 unique five-statement profiles each',()=>{
-  assert.equal(bank.length,3);
+test('4 demo themes (나를 소개합니다 포함) contain 100 unique five-statement profiles each',()=>{
+  assert.deepEqual(bank.map(t=>t.id),['intro','food','sport','animal']);
+  assert.equal(bank[0].label,'나를 소개합니다');
   for(const topic of bank) {
     assert.equal(topic.profiles.length,100);
     assert.equal(new Set(topic.profiles.map(p=>JSON.stringify(p))).size,100);
-    for(const profile of topic.profiles){assert.equal(profile.truths.length,5);assert.equal(profile.fakes.length,5);}
+    for(const profile of topic.profiles){
+      assert.equal(profile.truths.length,5);assert.equal(profile.fakes.length,5);
+      if(topic.id==='intro')profile.truths.forEach((t,i)=>assert.notEqual(t,profile.fakes[i]));
+    }
   }
+});
+test('bots join a room that already has real students, keep the teacher topic, and vote on real problems',async()=>{
+  const f=fixture();
+  f.state.room.topic='나를 소개합니다';
+  f.state.room.players.human1={name:'민준',submitted:true};
+  f.state.room.players.human2={name:'서연',submitted:false};
+  f.state.room.problems.human1={items:['a','b','c','d','e'],fakeIndex:3,realValue:'x',submittedAt:1};
+  await f.controller.add('intro',5);
+  assert.equal(Object.keys(f.state.room.players).length,7);
+  assert.equal(f.state.room.topic,'나를 소개합니다');
+  assert.equal(f.state.room.settings.demoBotIds.length,5);
+  assert.equal(f.state.room.players.human2.submitted,false);
+  await f.controller.add('food',1).then(()=>assert.fail('주제 혼합'),e=>assert.match(e.message,/비워/));
+  f.state.room.state='presenting';f.state.room.present={order:['human1'],idx:0,revealed:false,deadline:Date.now()+20000};
+  for(let i=0;i<10;i++)await f.controller.tick();
+  const votes=f.state.room.votes.human1;
+  assert.deepEqual(Object.keys(votes).sort(),[...f.state.room.settings.demoBotIds].sort());
+  assert.equal(votes.human1,undefined);assert.equal(votes.human2,undefined);
+});
+test('bot saves keep settings the teacher changed while bots were being created',async()=>{
+  const f=fixture();
+  let first=true;   // 첫 봇 뒤에 한 번만 바꾼다. 이후 저장이 이 값을 지우면 실패한다.
+  const controller=api.createController({getContext:()=>f.state,loadBank:async()=>bank,sleep:async()=>{if(first)f.state.room.settings.limitSec=45;first=false;}});
+  await controller.add('intro',3);
+  assert.equal(f.state.room.settings.limitSec,45);
+  assert.equal(f.state.room.settings.demoBotIds.length,3);
 });
 test('incremental creation reaches 50, submits real problems and writes per-student rows',async()=>{
   const f=fixture();

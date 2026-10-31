@@ -410,11 +410,11 @@
       <button class="btn warn" style="width:auto; padding:8px 14px; font-size:13px" id="btn-close-room">방 닫기</button>
     </div>
     <div class="card demo-controls">
-      <h2>🤖 촬영용 가상 학생</h2>
-      <p class="muted">주제별 100개의 가상 취향 소개 중에서 문제를 제출해요. 투표 정답률도 문제마다 달라져요. 학생이 없는 방에서 시작해 주세요.</p>
-      <label for="demo-topic">시연 주제</label><select id="demo-topic"><option value="food">음식 취향 소개</option><option value="sport">운동 취향 소개</option><option value="animal">동물 취향 소개</option></select>
+      <h2>🤖 봇 학생 추가</h2>
+      <p class="muted">주제별 100개의 가상 소개 중에서 문제를 제출해요. 실제 학생이 들어와 있어도 함께 넣을 수 있고, 봇도 친구들 문제에 투표해요. 투표 정답률은 문제마다 달라져요.</p>
+      <label for="demo-topic">봇 주제</label><select id="demo-topic"><option value="intro">나를 소개합니다</option><option value="food">음식 취향 소개</option><option value="sport">운동 취향 소개</option><option value="animal">동물 취향 소개</option></select>
       <div class="row"><button id="btn-demo-one" class="btn secondary">봇 1명 추가</button><button id="btn-demo-five" class="btn secondary">봇 5명 추가</button><button id="btn-demo-max" class="btn">최대 50명 채우기</button></div>
-      <button id="btn-demo-clear" class="btn secondary" style="margin-top:10px">시연 봇 비우기</button><p id="demo-status" role="status" class="muted"></p>
+      <button id="btn-demo-clear" class="btn secondary" style="margin-top:10px">봇만 비우기</button><p id="demo-status" role="status" class="muted"></p>
     </div>
     <div class="card center">
       <h2>📱 학생들은 QR을 찍어 주세요</h2>
@@ -534,7 +534,7 @@
       <button class="btn accent" id="btn-reveal">🎉 정답 공개</button>
       <button class="btn good" id="btn-next-q">다음 →</button>
     </div>
-    <div id="demo-present-controls" class="card hidden"><b>🤖 가상 학생 시연 중</b><button id="btn-demo-pause" class="btn secondary" style="margin-top:8px">봇 일시정지</button><p class="muted">봇은 자기 발표를 제외하고 실제 투표에 참여해요.</p></div>
+    <div id="demo-present-controls" class="card hidden"><b>🤖 봇 학생 참여 중</b><button id="btn-demo-pause" class="btn secondary" style="margin-top:8px">봇 일시정지</button><p class="muted">봇은 자기 발표를 제외하고 실제 투표에 참여해요.</p></div>
     <button class="btn secondary" id="btn-toggle-joinqr" style="margin-top:12px">📲 중간 입장 QR 숨기기</button>
     <div class="card" id="tp-joincard" style="margin-top:12px">
       <h2 class="center" style="margin-bottom:6px">📲 늦게 들어오거나 튕긴 학생용</h2>
@@ -619,8 +619,8 @@
 <!-- Firebase 대신 문수네집 홈서버의 PostgreSQL API를 사용합니다.
      postgres-adapter.v1.js 가 Firebase RTDB 문법을 그대로 받아 PostgreSQL로 번역하므로
      아래 앱 코드는 예전 그대로입니다. -->
-<script src="./postgres-adapter.v1.js?v=20261016"></script><!-- 어댑터는 서버가 4시간 캐시하므로, 어댑터를 고칠 때마다 v= 값을 바꿔야 학생·선생님 기기가 새 파일을 받는다 -->
-<script src="./demo-bots.js"></script>
+<script src="./postgres-adapter.v1.js?v=20261031"></script><!-- 어댑터는 서버가 4시간 캐시하므로, 어댑터를 고칠 때마다 v= 값을 바꿔야 학생·선생님 기기가 새 파일을 받는다 -->
+<script src="./demo-bots.js?v=20261031"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════
@@ -1751,7 +1751,7 @@ function syncFx(pres, owner, prob){
 
 const demoController=JJGDemo.createController({
   getContext:()=>({role:S.role,code:S.code,room:S.room,ref:S.code?roomRef():null}),
-  loadBank:async()=>{const response=await fetch('./demo-bank.json');if(!response.ok)throw Error('시연 예시를 읽지 못했어요.');return response.json();},
+  loadBank:async()=>{const response=await fetch('./demo-bank.json?v=20261031');if(!response.ok)throw Error('봇 예시를 읽지 못했어요.');return response.json();},
   onStatus:text=>{S.demoStatus=text;updateDemoControls();}
 });
 function updateDemoControls(){
@@ -1762,7 +1762,8 @@ function updateDemoControls(){
   $('demo-topic').disabled=Boolean(settings.demoTopic)||S.demoPending||demoController.busy;
   if(settings.demoTopic)$('demo-topic').value=settings.demoTopic;
   $('btn-demo-pause').textContent=demoController.paused?'봇 계속 진행':'봇 일시정지';
-  $('demo-status').textContent=S.demoStatus||(count?'시연 모드 · 봇 '+count+'명 / 학생 최대 50명':'시연 주제로 바뀌며 선생님은 학생 수에 포함되지 않아요.');
+  const real=Object.keys(S.room?.players||{}).length-count;
+  $('demo-status').textContent=S.demoStatus||(count?'봇 '+count+'명 · 실제 학생 '+real+'명 / 최대 50명':'선생님은 학생 수에 포함되지 않아요. 학생이 없으면 방 주제가 봇 주제로 바뀌어요.');
 }
 async function demoCommand(action){
   if(S.demoPending)return;
